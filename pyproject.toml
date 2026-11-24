@@ -62,4 +62,4 @@ dev = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["insightflow"]
+known-first-party = ["insightflow", "pipeline_helpers"]
