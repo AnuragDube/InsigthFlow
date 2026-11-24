@@ -63,3 +63,7 @@ dev = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["insightflow", "pipeline_helpers"]
+
+[[tool.mypy.overrides]]
+module = ["openpyxl", "openpyxl.*"]
+ignore_missing_imports = true  # dev-only tool for sample conversion
