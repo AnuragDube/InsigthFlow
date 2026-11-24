@@ -14,7 +14,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from insightflow.api import middleware
 from insightflow.api.background import run_in_background
 from insightflow.api.body_limit import BodySizeLimitMiddleware
-from insightflow.api.routers import datasets, health, runs
+from insightflow.api.routers import analytics, datasets, health, runs
 from insightflow.core.logging import configure_logging
 from insightflow.core.settings import Settings, get_settings
 from insightflow.metadata.bootstrap import ensure_demo_org
@@ -74,4 +74,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(datasets.router)
     app.include_router(runs.router)
+    app.include_router(analytics.router)
     return app
