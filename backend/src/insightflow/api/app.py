@@ -15,6 +15,7 @@ from insightflow.api import middleware
 from insightflow.api.background import run_in_background
 from insightflow.api.body_limit import BodySizeLimitMiddleware
 from insightflow.api.routers import analytics, datasets, health, runs
+from insightflow.api.spa import SecurityHeadersMiddleware, mount_spa
 from insightflow.core.logging import configure_logging
 from insightflow.core.settings import Settings, get_settings
 from insightflow.metadata.bootstrap import ensure_demo_org
@@ -69,10 +70,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         max_bytes=settings.max_upload_mb * 1024 * 1024 + 64 * 1024,  # + multipart framing
         limit_mb=settings.max_upload_mb,
     )
+    app.add_middleware(SecurityHeadersMiddleware)
     # Outermost: reject unexpected Host headers (defeats DNS rebinding against localhost).
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts)
     app.include_router(health.router)
     app.include_router(datasets.router)
     app.include_router(runs.router)
     app.include_router(analytics.router)
+    if settings.frontend_dist is not None:
+        mount_spa(app, settings.frontend_dist)  # last: catch-all for client-side routes
     return app
