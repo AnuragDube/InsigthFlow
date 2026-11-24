@@ -10,6 +10,7 @@ or write files, attach databases, install extensions, or loosen its own settings
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 import duckdb
 from sqlalchemy.engine import Engine
@@ -22,7 +23,7 @@ from insightflow.metadata.repositories import DataSourceRepo
 from insightflow.warehouse.paths import OrgPaths
 
 
-def sandbox_config(settings: Settings) -> dict[str, str | bool | int]:
+def sandbox_config(settings: Settings) -> dict[str, Any]:
     return {
         "enable_external_access": False,
         "autoinstall_known_extensions": False,
