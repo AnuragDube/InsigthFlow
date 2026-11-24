@@ -1,0 +1,11 @@
+# Input contract for e-commerce order-line CSVs (UCI Online Retail II layout).
+version: "1"
+columns:            # source header -> Silver column
+  Invoice: invoice_no
+  StockCode: stock_code
+  Description: description
+  Quantity: quantity
+  InvoiceDate: invoice_ts
+  Price: unit_price
+  Customer ID: customer_id
+  Country: country

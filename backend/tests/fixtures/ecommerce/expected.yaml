@@ -1,0 +1,19 @@
+# Hand-computed from batch_a.csv (14 lines) + batch_b.csv (8 lines). Arithmetic in README.md.
+silver:
+  rows_in: 22
+  quarantined: 2            # A11 bad timestamp, A12 bad quantity
+  overlap_removed: 2        # B1 (=A1), B2 (=A3; A has 2 copies, B 1 -> keep max = 2)
+  rows_out: 18
+  within_batch_repeats: 1   # A4 repeats A3 inside batch A (kept)
+  null_customer_rows: 3     # A5, A8, A9
+gold:
+  fact_sales_rows: 10
+  gross_revenue: "140.445"
+  units_sold: 60
+  orders: 7
+  fact_returns_rows: 2
+  returns_value: "6.95"
+  known_customers: 4
+  dim_customer_rows: 5      # 4 known + UNKNOWN member
+  dim_product_rows: 7
+  primary_country_12583: Germany   # fact_sales lines: France 1, Germany 2

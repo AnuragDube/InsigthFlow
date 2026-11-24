@@ -1,0 +1,5 @@
+# Business rules derived from profiling the real data (docs/DATA_PROFILE.md).
+# Stock codes that are not merchandise (postage, fees, discounts, manual entries, vouchers, tests).
+# Compared after upper-casing and trimming the code.
+adjustment_codes: [POST, DOT, M, C2, D, S, B, BANK CHARGES, ADJUST, AMAZONFEE, PADS, CRUK]
+adjustment_code_patterns: ["GIFT_%", "TEST%"]   # SQL LIKE patterns on the upper-cased code
