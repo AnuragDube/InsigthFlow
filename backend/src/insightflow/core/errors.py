@@ -36,3 +36,7 @@ class ForbiddenError(AppError):
 
 class NoPublishedData(ConflictError):
     type_slug, title = "no-published-data", "No published data"
+
+
+class PayloadTooLarge(AppError):
+    status, type_slug, title = 413, "payload-too-large", "Payload too large"

@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.engine import Engine
 
 from insightflow.core.context import OrgContext
-from insightflow.core.errors import ValidationFailed
+from insightflow.core.errors import PayloadTooLarge, ValidationFailed
 from insightflow.core.settings import Settings
 from insightflow.ingestion.service import ingest_file
 from insightflow.metadata.bootstrap import ensure_demo_org
@@ -96,7 +96,7 @@ def test_non_text_file_rejected(settings: Settings, env) -> None:  # type: ignor
 
 def test_size_cap_enforced(settings: Settings, env) -> None:  # type: ignore[no-untyped-def]
     tiny = settings.model_copy(update={"max_upload_mb": 0})
-    with pytest.raises(ValidationFailed) as exc:
+    with pytest.raises(PayloadTooLarge) as exc:
         _ingest(tiny, env, "batch_a.csv")
     assert "too large" in exc.value.detail
 

@@ -22,7 +22,7 @@ import duckdb
 from sqlalchemy.engine import Engine
 
 from insightflow.core.context import OrgContext
-from insightflow.core.errors import ConflictError, ValidationFailed
+from insightflow.core.errors import ConflictError, PayloadTooLarge, ValidationFailed
 from insightflow.core.ids import new_id
 from insightflow.core.settings import Settings
 from insightflow.domains.loader import load_domain_pack
@@ -48,7 +48,7 @@ def _spool(src: BinaryIO, dest: Path, max_bytes: int) -> tuple[str, int]:
         while chunk := src.read(_CHUNK):
             size += len(chunk)
             if size > max_bytes:
-                raise ValidationFailed("The file is too large.")
+                raise PayloadTooLarge("The file is too large.")
             digest.update(chunk)
             out.write(chunk)
     return digest.hexdigest(), size

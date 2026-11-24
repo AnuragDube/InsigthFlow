@@ -2,15 +2,44 @@
 
 from __future__ import annotations
 
+import logging
+import threading
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from insightflow.api import middleware
-from insightflow.api.routers import health
+from insightflow.api.background import run_in_background
+from insightflow.api.routers import datasets, health, runs
 from insightflow.core.logging import configure_logging
 from insightflow.core.settings import Settings, get_settings
-from insightflow.metadata.db import make_engine
+from insightflow.metadata.bootstrap import ensure_demo_org
+from insightflow.metadata.db import make_engine, session_scope
+from insightflow.metadata.migrate import upgrade_to_head
+from insightflow.pipeline.service import recover_interrupted_runs
+
+log = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings: Settings = app.state.settings
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    upgrade_to_head(settings.database_url)
+    with session_scope(app.state.engine) as s:
+        app.state.demo_ctx = ensure_demo_org(s, settings.demo_org_slug)
+    # Single process: anything still 'running' was interrupted by a restart (ARCHITECTURE §3.1).
+    for ctx, run_id in recover_interrupted_runs(app.state.engine):
+        threading.Thread(
+            target=run_in_background,
+            args=(ctx, app.state.engine, settings, run_id),
+            daemon=True,
+        ).start()
+    yield
+    app.state.engine.dispose()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -18,6 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if settings.environment != "test":
         configure_logging()
     app = FastAPI(
+        lifespan=lifespan,
         title="InsightFlow API",
         version="0.1.0",
         docs_url="/docs" if settings.environment == "dev" else None,
@@ -36,4 +66,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Outermost: reject unexpected Host headers (defeats DNS rebinding against localhost).
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts)
     app.include_router(health.router)
+    app.include_router(datasets.router)
+    app.include_router(runs.router)
     return app

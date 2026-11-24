@@ -24,6 +24,8 @@ from insightflow.metadata.models import (
     DataSource,
     Ingestion,
     PipelineRun,
+    PipelineStageRun,
+    QualityResult,
 )
 
 
@@ -136,6 +138,15 @@ class IngestionRepo:
         )
         return list(self.s.scalars(q))
 
+    def set_active(
+        self, ctx: OrgContext, source_id: uuid.UUID, ingestion_id: uuid.UUID, active: bool
+    ) -> Ingestion:
+        ing = self.get(ctx, source_id, ingestion_id)
+        if ing.status != "stored":
+            raise ConflictError("Only stored batches can be activated or deactivated.")
+        ing.is_active = active
+        return ing
+
     def list_active(self, ctx: OrgContext, source_id: uuid.UUID) -> list[Ingestion]:
         return [i for i in self.list_all(ctx, source_id) if i.status == "stored" and i.is_active]
 
@@ -179,6 +190,22 @@ class RunRepo:
             .where(PipelineRun.org_id == ctx.org_id, PipelineRun.data_source_id == source_id)
             .order_by(PipelineRun.created_at.desc(), PipelineRun.id.desc())
             .limit(limit)
+        )
+        return list(self.s.scalars(q))
+
+    def stages(self, ctx: OrgContext, run_id: uuid.UUID) -> list[PipelineStageRun]:
+        q = (
+            select(PipelineStageRun)
+            .where(PipelineStageRun.org_id == ctx.org_id, PipelineStageRun.run_id == run_id)
+            .order_by(PipelineStageRun.started_at)
+        )
+        return list(self.s.scalars(q))
+
+    def quality(self, ctx: OrgContext, run_id: uuid.UUID) -> list[QualityResult]:
+        q = (
+            select(QualityResult)
+            .where(QualityResult.org_id == ctx.org_id, QualityResult.run_id == run_id)
+            .order_by(QualityResult.stage.desc(), QualityResult.rule_id)
         )
         return list(self.s.scalars(q))
 
