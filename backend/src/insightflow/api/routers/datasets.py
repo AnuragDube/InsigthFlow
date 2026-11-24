@@ -7,7 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Response, UploadF
 from sqlalchemy.engine import Engine
 
 from insightflow.api.background import run_in_background
-from insightflow.api.deps import get_engine, get_org_context, get_settings_dep, limit_upload_size
+from insightflow.api.deps import get_engine, get_org_context, get_settings_dep
 from insightflow.api.schemas import (
     DatasetCreate,
     DatasetOut,
@@ -74,11 +74,7 @@ def list_ingestions(dataset_id: uuid.UUID, ctx: Ctx, engine: Eng) -> Page[Ingest
         return Page(items=[IngestionOut.model_validate(i) for i in items if i.status == "stored"])
 
 
-@router.post(
-    "/{dataset_id}/uploads",
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(limit_upload_size)],
-)
+@router.post("/{dataset_id}/uploads", status_code=status.HTTP_201_CREATED)
 def upload(
     dataset_id: uuid.UUID,
     file: Annotated[UploadFile, File()],

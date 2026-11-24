@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -61,11 +61,22 @@ class DataSourceRepo:
             raise NotFoundError("Dataset not found.")
         return ds
 
-    def get_for_update(self, ctx: OrgContext, source_id: uuid.UUID) -> DataSource:
-        ds = self.s.get(DataSource, (ctx.org_id, source_id), with_for_update=True)
-        if ds is None:
+    def lock(self, ctx: OrgContext, source_id: uuid.UUID) -> DataSource:
+        """Serialize pipeline-state changes for one data source.
+
+        Must be the FIRST statement of the transaction. A no-op UPDATE takes the database write
+        lock on SQLite (others wait up to busy_timeout) and a row lock on PostgreSQL, so
+        check-then-act sequences ("is a run active? then set the marker") cannot interleave.
+        """
+        result = self.s.execute(
+            update(DataSource)
+            .where(DataSource.org_id == ctx.org_id, DataSource.id == source_id)
+            .values(rerun_requested_at=DataSource.rerun_requested_at)
+            .execution_options(synchronize_session=False)
+        )
+        if getattr(result, "rowcount", 1) == 0:
             raise NotFoundError("Dataset not found.")
-        return ds
+        return self.get(ctx, source_id)
 
     def list_all(self, ctx: OrgContext) -> list[DataSource]:
         q = select(DataSource).where(DataSource.org_id == ctx.org_id).order_by(DataSource.name)

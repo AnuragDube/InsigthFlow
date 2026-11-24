@@ -13,6 +13,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from insightflow.api import middleware
 from insightflow.api.background import run_in_background
+from insightflow.api.body_limit import BodySizeLimitMiddleware
 from insightflow.api.routers import datasets, health, runs
 from insightflow.core.logging import configure_logging
 from insightflow.core.settings import Settings, get_settings
@@ -62,6 +63,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "POST", "PATCH", "DELETE"],
         allow_headers=["Content-Type", middleware.CLIENT_HEADER, "X-Correlation-ID"],
         allow_credentials=False,
+    )
+    app.add_middleware(
+        BodySizeLimitMiddleware,
+        max_bytes=settings.max_upload_mb * 1024 * 1024 + 64 * 1024,  # + multipart framing
+        limit_mb=settings.max_upload_mb,
     )
     # Outermost: reject unexpected Host headers (defeats DNS rebinding against localhost).
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts)

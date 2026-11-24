@@ -15,6 +15,7 @@ import os
 import shutil
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import BinaryIO
 
@@ -150,6 +151,9 @@ def ingest_file(
             }
             (out_dir / "_manifest.json").write_text(json.dumps(manifest, indent=2), "utf-8")
             with session_scope(engine) as s:
+                # Same transaction as the batch: durable "pending work" marker. If the process dies
+                # before a run is requested, the startup sweep still processes this batch.
+                DataSourceRepo(s).lock(ctx, source_id).rerun_requested_at = datetime.now(UTC)
                 ing = IngestionRepo(s).add(
                     ctx, source_id, ingestion_id=ingest_id, original_name=safe_name,
                     sha256=sha, size_bytes=size, status="stored", row_count=rows,

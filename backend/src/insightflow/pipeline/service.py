@@ -80,22 +80,19 @@ def request_run(
     trigger: str,
     code_version: str = "dev",
 ) -> PipelineRun | None:
-    """Queue a run, or — if one is already active — set the durable re-run marker.
+    """Queue a run, or — if one is already active — leave the durable re-run marker set.
 
-    Returns the queued run, or ``None`` when the request was coalesced into a follow-up run.
+    One locked transaction: either a new run is created (and the marker cleared, because the new
+    run will read every active batch), or the marker is set for the active run to pick up when it
+    finishes. Returns the queued run, or ``None`` when the request was coalesced.
     """
-    try:
-        with session_scope(engine) as s:
-            DataSourceRepo(s).get(ctx, source_id)
-            if RunRepo(s).active_for_source(ctx, source_id) is None:
-                return RunRepo(s).create_queued(
-                    ctx, source_id, trigger=trigger, code_version=code_version
-                )
-    except ConflictError:
-        pass  # lost a race with another request: fall through to the marker
     with session_scope(engine) as s:
-        DataSourceRepo(s).get(ctx, source_id).rerun_requested_at = _now()
-    return None
+        source = DataSourceRepo(s).lock(ctx, source_id)
+        if RunRepo(s).active_for_source(ctx, source_id) is not None:
+            source.rerun_requested_at = _now()
+            return None
+        source.rerun_requested_at = None
+        return RunRepo(s).create_queued(ctx, source_id, trigger=trigger, code_version=code_version)
 
 
 # --------------------------------------------------------------------------- executing runs
@@ -151,15 +148,17 @@ def _save_quality(
 def _finish(
     s: Session,
     ctx: OrgContext,
-    run: PipelineRun,
+    source_id: uuid.UUID,
+    run_id: uuid.UUID,
     status: str,
     error_code: str | None = None,
-) -> uuid.UUID | None:
-    """Close the run; in the same transaction, turn a pending re-run marker into the next run."""
+) -> tuple[PipelineRun, uuid.UUID | None]:
+    """Close the run; in the same locked transaction, turn a pending marker into the next run."""
+    source = DataSourceRepo(s).lock(ctx, source_id)  # first statement: serializes with requests
+    run = RunRepo(s).get(ctx, run_id)
     run.status = status
     run.finished_at = _now()
     run.error_code = error_code
-    source = DataSourceRepo(s).get_for_update(ctx, run.data_source_id)
     if status == "succeeded":
         source.published_run_id = run.id
     s.flush()  # the run is no longer active before a follow-up is inserted (single-writer index)
@@ -173,12 +172,29 @@ def _finish(
         details={"status": status, "error_code": error_code},
     )
     if source.rerun_requested_at is None:
-        return None
+        return run, None
     source.rerun_requested_at = None
     follow_up = RunRepo(s).create_queued(
         ctx, source.id, trigger="rerun", code_version=run.code_version
     )
-    return follow_up.id
+    return run, follow_up.id
+
+
+def _fail_safely(ctx: OrgContext, engine: Engine, run_id: uuid.UUID) -> uuid.UUID | None:
+    """Best effort: never leave a run queued/running after an unexpected error."""
+    try:
+        with session_scope(engine) as s:
+            run = RunRepo(s).get(ctx, run_id)
+            if run.status not in ACTIVE_RUN_STATUSES:
+                return None
+            source_id = run.data_source_id
+        with session_scope(engine) as s:
+            return _finish(s, ctx, source_id, run_id, "failed", "internal_error")[1]
+    except Exception:
+        log.exception(
+            "could not mark run failed; the startup sweep will", extra={"run_id": str(run_id)}
+        )
+        return None
 
 
 def _execute(
@@ -190,10 +206,13 @@ def _execute(
 ) -> tuple[PipelineRun, uuid.UUID | None]:
     paths = OrgPaths(settings.data_dir, ctx.org_id)
     with session_scope(engine) as s:
+        peek = RunRepo(s).get(ctx, run_id)
+        source_id = peek.data_source_id
+    with session_scope(engine) as s:
+        source = DataSourceRepo(s).lock(ctx, source_id)  # first statement of the transaction
         run = RunRepo(s).get(ctx, run_id)
         if run.status != "queued":
             raise ConflictError("Only queued runs can be executed.")
-        source = DataSourceRepo(s).get(ctx, run.data_source_id)
         pack = pack or load_domain_pack(source.domain)
         batches = IngestionRepo(s).list_active(ctx, source.id)
         run.status, run.started_at = "running", _now()
@@ -203,7 +222,6 @@ def _execute(
                     org_id=ctx.org_id, run_id=run.id, ingestion_id=b.id, data_source_id=source.id
                 )
             )
-        source_id = source.id
         inputs = [
             BatchInput(b.id, paths.bronze_dir(source_id, b.id) / "data.parquet", order)
             for order, b in enumerate(batches)
@@ -260,13 +278,9 @@ def _execute(
 
     if status == "succeeded":
         with _stage(engine, ctx, run_id, "publish"), session_scope(engine) as s:
-            run = RunRepo(s).get(ctx, run_id)
-            next_id = _finish(s, ctx, run, "succeeded")
-    else:
-        with session_scope(engine) as s:
-            run = RunRepo(s).get(ctx, run_id)
-            next_id = _finish(s, ctx, run, status, error_code)
-    return run, next_id
+            return _finish(s, ctx, source_id, run_id, "succeeded")
+    with session_scope(engine) as s:
+        return _finish(s, ctx, source_id, run_id, status, error_code)
 
 
 def run_pipeline(
@@ -281,7 +295,16 @@ def run_pipeline(
     executed: list[PipelineRun] = []
     next_id: uuid.UUID | None = run_id
     while next_id is not None:
-        run, next_id = _execute(ctx, engine, settings, next_id, pack)
+        current = next_id
+        try:
+            run, next_id = _execute(ctx, engine, settings, current, pack)
+        except ConflictError:
+            raise  # not queued (e.g. already executed): nothing to clean up
+        except Exception:
+            log.exception("pipeline run crashed outside its stages", extra={"run_id": str(current)})
+            next_id = _fail_safely(ctx, engine, current)
+            with session_scope(engine) as s:
+                run = RunRepo(s).get(ctx, current)
         executed.append(run)
     return executed
 
