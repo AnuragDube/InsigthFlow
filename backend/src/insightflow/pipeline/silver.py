@@ -29,6 +29,22 @@ class SilverStats:
     within_batch_repeats: int
 
 
+_IDENTITY = (
+    "invoice_no, stock_code, description, quantity, invoice_ts, unit_price, customer_id, country"
+)
+# Copies of a line beyond the largest count found in any single batch: max(k, m) is kept.
+_OVERLAP_SQL = f"""
+WITH per_batch AS (
+    SELECT {_IDENTITY}, _ingest_id, count(*) AS k
+    FROM typed WHERE reason_code IS NULL
+    GROUP BY ALL
+)
+SELECT coalesce(sum(total - biggest), 0) FROM (
+    SELECT sum(k) AS total, max(k) AS biggest FROM per_batch GROUP BY {_IDENTITY}
+)
+"""
+
+
 def _count(con: duckdb.DuckDBPyConnection, sql: str) -> int:
     row = con.execute(sql).fetchone()
     return int(row[0]) if row else 0
@@ -72,14 +88,16 @@ def build_silver_in(
         "COPY (SELECT * FROM rejected ORDER BY _ingest_id, _row_number) "
         f"TO {sql_literal(quarantine_dir / 'rejected.parquet')} (FORMAT parquet)"
     )
-    rows_in = _count(con, "SELECT count(*) FROM typed")
+    rows_in = _count(con, "SELECT count(*) FROM bronze")
     quarantined = _count(con, "SELECT count(*) FROM rejected")
     rows_out = _count(con, "SELECT count(*) FROM order_lines")
     return SilverStats(
         rows_in=rows_in,
         rows_out=rows_out,
         quarantined=quarantined,
-        overlap_removed=rows_in - quarantined - rows_out,
+        # Counted independently of order_lines (from the duplicate groups themselves) so the
+        # row_reconciliation rule can detect rows lost by a faulty model.
+        overlap_removed=_count(con, _OVERLAP_SQL),
         within_batch_repeats=_count(
             con, "SELECT count(*) FROM order_lines WHERE occurrence_no > 1"
         ),

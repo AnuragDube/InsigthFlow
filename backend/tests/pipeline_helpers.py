@@ -30,13 +30,15 @@ def setup_source(settings: Settings) -> tuple[Engine, OrgContext, uuid.UUID]:
 
 def ingest_fixtures(
     settings: Settings, engine: Engine, ctx: OrgContext, source_id: uuid.UUID,
-    names: tuple[str, ...] = ("batch_a.csv", "batch_b.csv"),
+    names: tuple[str | Path, ...] = ("batch_a.csv", "batch_b.csv"),
 ) -> list[BatchInput]:  # fmt: skip
+    """Ingest fixture files (names relative to the fixtures dir, or full paths)."""
     paths = OrgPaths(settings.data_dir, ctx.org_id)
     inputs = []
     for order, name in enumerate(names):
-        with (FIX / name).open("rb") as f:
-            ing = ingest_file(ctx, engine, settings, source_id, f, name).ingestion
+        path = name if isinstance(name, Path) else FIX / name
+        with path.open("rb") as f:
+            ing = ingest_file(ctx, engine, settings, source_id, f, path.name).ingestion
         pq = paths.bronze_dir(source_id, ing.id) / "data.parquet"
         inputs.append(BatchInput(ingest_id=ing.id, parquet=pq, order=order))
     return inputs

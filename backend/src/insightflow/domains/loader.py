@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +26,15 @@ class DomainPack:
     @property
     def required_columns(self) -> list[str]:
         return list(self.column_map)
+
+    def with_threshold(self, rule_id: str, threshold: float) -> DomainPack:
+        """A copy with one rule's threshold changed (tests now; per-org overrides later)."""
+        if rule_id not in {r.id for r in self.quality_rules}:
+            raise KeyError(rule_id)
+        rules = [
+            replace(r, threshold=threshold) if r.id == rule_id else r for r in self.quality_rules
+        ]
+        return replace(self, quality_rules=rules)
 
 
 def _yaml(path: Path) -> Any:

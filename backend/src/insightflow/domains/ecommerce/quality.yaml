@@ -1,1 +1,95 @@
-rules: []
+# Data quality rules. Each `sql` returns ONE number ("observed"), compared with `threshold` via `op`.
+# blocking = failing stops publication; warning = reported only. A NULL observation fails.
+# Silver-stage tables: bronze, typed, rejected, order_lines, stats. Gold stage: Gold tables plus
+# order_lines (Silver, read-only) for reconciliation.
+rules:
+  - id: quarantine_ratio
+    stage: silver
+    severity: blocking
+    op: "<="
+    threshold: 0.01
+    sql: SELECT quarantined::DOUBLE / NULLIF(rows_in, 0) FROM stats
+    description: Share of input rows that could not be typed (bad dates, quantities, prices, keys).
+
+  - id: row_reconciliation
+    stage: silver
+    severity: blocking
+    op: "=="
+    threshold: 0
+    sql: SELECT rows_in - rows_out - quarantined - overlap_removed FROM stats
+    description: Every input row is accounted for as kept, quarantined or cross-batch overlap.
+
+  - id: cross_batch_overlap_removed
+    stage: silver
+    severity: warning
+    op: ">="
+    threshold: 0
+    sql: SELECT overlap_removed FROM stats
+    description: Lines also present in an earlier batch (overlapping exports), removed by the multiplicity rule.
+
+  - id: within_batch_repeat_ratio
+    stage: silver
+    severity: warning
+    op: "<="
+    threshold: 0.05
+    sql: SELECT within_batch_repeats::DOUBLE / NULLIF(rows_out, 0) FROM stats
+    description: Identical lines repeated inside one batch (kept; may be genuine repeat purchases).
+
+  - id: customer_null_ratio
+    stage: silver
+    severity: warning
+    op: "<="
+    threshold: 0.30
+    sql: SELECT count(*) FILTER (WHERE customer_id IS NULL)::DOUBLE / NULLIF(count(*), 0) FROM order_lines
+    description: Share of lines without a customer id (UCI is known to have many).
+
+  - id: gold_fact_sales_not_empty
+    stage: gold
+    severity: blocking
+    op: ">="
+    threshold: 1
+    sql: SELECT count(*) FROM fact_sales
+    description: At least one sale line reached Gold.
+
+  - id: gold_null_keys
+    stage: gold
+    severity: blocking
+    op: "=="
+    threshold: 0
+    sql: >-
+      SELECT (SELECT count(*) FROM fact_sales WHERE invoice_no IS NULL OR stock_code IS NULL
+              OR customer_key IS NULL OR invoice_date IS NULL)
+           + (SELECT count(*) FROM fact_returns WHERE invoice_no IS NULL OR stock_code IS NULL
+              OR customer_key IS NULL OR invoice_date IS NULL)
+    description: No fact row is missing a key.
+
+  - id: gold_orphan_facts
+    stage: gold
+    severity: blocking
+    op: "=="
+    threshold: 0
+    sql: >-
+      SELECT (SELECT count(*) FROM fact_sales f
+              LEFT JOIN dim_customer c USING (customer_key)
+              LEFT JOIN dim_product p USING (stock_code)
+              LEFT JOIN dim_date d ON d.date = f.invoice_date
+              WHERE c.customer_key IS NULL OR p.stock_code IS NULL OR d.date IS NULL)
+           + (SELECT count(*) FROM fact_returns f
+              LEFT JOIN dim_customer c USING (customer_key)
+              LEFT JOIN dim_product p USING (stock_code)
+              LEFT JOIN dim_date d ON d.date = f.invoice_date
+              WHERE c.customer_key IS NULL OR p.stock_code IS NULL OR d.date IS NULL)
+    description: Every fact row joins to its customer, product and date dimensions.
+
+  - id: gold_revenue_reconciliation
+    stage: gold
+    severity: blocking
+    op: "<="
+    threshold: 0.01
+    sql: >-
+      SELECT abs(
+        (SELECT coalesce(sum(revenue), 0) FROM fact_sales)
+        - (SELECT coalesce(sum(quantity * unit_price), 0) FROM order_lines
+           WHERE NOT is_cancellation AND NOT is_bad_debt AND NOT is_adjustment
+             AND NOT is_writeoff AND quantity > 0 AND unit_price > 0))
+    description: Gold revenue equals revenue re-derived independently from Silver (difference in GBP).
