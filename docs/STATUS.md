@@ -1,12 +1,13 @@
 # Project status — read this first when resuming
 
-Last updated: 2026-11-24 19:30 UTC (Wed 25 Nov, 01:00 IST) · Updated by: Claude Code (lead engineer)
+Last updated: 2026-11-24 19:32 UTC (Wed 25 Nov, 01:02 IST) · Updated by: Copilot
 
 ## Where we are
 - **Phase 1 (architecture): approved 2026-11-24.**
 - **M1 = Phases 2+3 "Data foundation": complete on branch `m1-data-foundation`** (94 tests).
+  Published to GitHub at `AnuragDube/InsigthFlow`; Windows verification remains pending.
   Independent review: 0 critical; 3 important + 2 re-graded findings fixed with regression tests.
-  `/security-review`: no findings. Waiting for the owner to push the bundle.
+  `/security-review`: no findings.
 - Next: **M2 = Phase 4** — metric registry + metrics API + React dashboard.
 - Working title per handover: "Data Intelligence Platform"; `InsightFlow`/`insightflow` remain the
   repo and package identifiers.
@@ -26,10 +27,10 @@ Last updated: 2026-11-24 19:30 UTC (Wed 25 Nov, 01:00 IST) · Updated by: Claude
 | Sandboxed read-only Gold reader (11 escape attempts blocked) | `backend/tests/security/test_gold_sandbox.py` |
 | HTTP API: datasets, uploads, load-sample, batch (de)activation, runs, quality | `test_api_datasets.py` |
 | Real UCI run: 1,067,371 lines → published Gold in ≈3.2 s; overlap 22,523 removed; reruns identical | `docs/DATA_PROFILE.md` (Linux container) |
-| **Not yet verified on the owner's Windows laptop** | everything above — CI includes a Windows job once pushed |
+| **Not yet verified on the owner's Windows laptop** | everything above — CI includes a Windows job |
 
 ## Current task
-M1 handed off as a git bundle. Next: plan M2 (Phase 4: metric registry, metrics API, React dashboard).
+M1 is published to GitHub. Next: plan M2 (Phase 4: metric registry, metrics API, React dashboard).
 
 ## Known minor issues (deferred from M1 review)
 - Revenue reconciliation rule reuses Silver flags (not fully independent of fact eligibility).
@@ -48,7 +49,7 @@ M1 handed off as a git bundle. Next: plan M2 (Phase 4: metric registry, metrics 
 - Still escalated to owner: spending, credentials, external deployment, destructive actions.
 
 ## Blockers / environment
-- Cloud dev container cannot push to GitHub → hand-off via git bundle (owner pushes).
+- Cloud dev container cannot push to GitHub; M1 was published from the owner's Windows environment.
 - Network: `archive.ics.uci.edu` allowed via the personal environment "InsigthFlow" (created
   2026-11-24). `api.groq.com` still blocked — requested with the key at Phase 5.
 - Context7 MCP not connected; library behaviour verified by tests/spikes instead.
