@@ -9,6 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,8 +24,11 @@ class Settings(BaseSettings):
     max_upload_mb: int = 200
     cors_origins: list[str] = ["http://localhost:5173"]
     trusted_hosts: list[str] = ["localhost", "127.0.0.1", "testserver"]
-    duckdb_memory_limit: str = "2GB"
-    duckdb_threads: int = 4
+    # Interpolated into DuckDB SET statements, so the format is strictly validated.
+    duckdb_memory_limit: str = Field(
+        default="2GB", pattern=r"^[0-9]{1,6}(\.[0-9]{1,3})?(KB|MB|GB)$"
+    )
+    duckdb_threads: int = Field(default=4, ge=1, le=64)
     code_version: str = "dev"  # set to the git SHA in deployments (reproducibility)
 
 
