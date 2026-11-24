@@ -20,7 +20,7 @@ engine replaceable.
 | Technology | Role | In P0? |
 |---|---|---|
 | **Parquet** | The physical format of Bronze (copy of raw), Silver and Gold tables. Engine-neutral. | Yes |
-| **DuckDB** | Executes Silver/Gold SQL models and quality rules over Parquet; serves Gold to the API via a per-org `gold.duckdb` holding **views over the published Parquet**; sandboxed read-only connection for NL-to-SQL. | Yes |
+| **DuckDB** | Executes Silver/Gold SQL models and quality rules over Parquet; serves Gold to the API from a per-org DuckDB file in which Gold tables are **materialized** (see SECURITY §5 for why not views); sandboxed read-only connection for NL-to-SQL. | Yes |
 | **PostgreSQL** | Application metadata only, in deployed environments. Never stores analytical facts. | Schema designed; SQLite used locally until P1 |
 | **Delta Lake (delta-rs)** | Not in P0. Candidate for Silver/Gold when incremental MERGE or concurrent writers appear, and as the format of the Databricks implementation. See §5. | No |
 | **PySpark (Databricks Free Edition)** | Second implementation of the same Silver/Gold logic for scale/interview demonstration, validated by parity tests on shared fixtures. Not on the primary dev path. | P1 |
@@ -40,7 +40,8 @@ data/orgs/{org_id}/
   silver/{table}/_current                              # text file: run_id of the published version
   gold/{table}/run_id={uuid}/part-*.parquet
   gold/{table}/_current
-  gold.duckdb                                          # views → gold/{table}/run_id={current}/*.parquet
+  gold/_db/gold_{run_id}.duckdb                        # Gold tables materialized for serving + NL-to-SQL
+  gold/_db/_current                                    # run_id of the published Gold DB
   quarantine/{dataset}/run_id={uuid}/rejected.parquet  # rows rejected in Silver + reason codes
   rag/bm25_index/                                      # retrieval index (see ARCHITECTURE §6.4)
 ```
@@ -114,7 +115,7 @@ Thresholds are configuration, reviewed when real data is profiled in Phase 3 (no
 ## 4. Idempotency, atomic publish and reproducibility
 - Each run writes to `.../run_id={new}/`; nothing reads that directory until publish.
 - Publish = all quality gates passed → write `_current` files via write-temp-then-`os.replace` (atomic on
-  Windows and POSIX for the same volume), then recreate `gold.duckdb` views. Readers see either old or new.
+  Windows and POSIX for the same volume), then point `gold/_db/_current` at the new Gold DB file. API connections open the current file per request (cheap for DuckDB). Readers see either old or new.
 - A failed or blocked run leaves the previous published version intact and visible.
 - Same Bronze set ⇒ same Silver/Gold (deterministic SQL: explicit `ORDER BY` for tie-breaks, no `now()` in
   models; run timestamp stored only in metadata). Tested by running twice and comparing sorted outputs.
@@ -383,7 +384,7 @@ These checks become automated migration tests in the metadata phase.
 2. **Repository layer:** every repository method takes `OrgContext` as a required first argument and adds
    `WHERE org_id = :org_id`; no "unscoped" query helpers exist. Tests assert cross-org reads return nothing.
 3. **Schema:** composite FKs on `(org_id, id)` make cross-org references impossible at the DB level.
-4. **Analytical data:** physical separation — each org has its own directory and `gold.duckdb`; the
+4. **Analytical data:** physical separation — each org has its own directory and Gold DB file; the
    sandboxed connection is opened on one org's file with external access disabled, so SQL cannot reach
    another org's files even if validation were bypassed (verified behaviour in DuckDB 2.0.1, see SECURITY §5).
 5. **P2 defence in depth:** PostgreSQL Row-Level Security policies using `current_setting('app.org_id')`
