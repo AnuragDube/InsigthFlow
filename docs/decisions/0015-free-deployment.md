@@ -1,6 +1,6 @@
 # ADR-0015: Local-first demo; optional stateless read-only public demo
 
-- **Status:** Accepted
+- **Status:** Proposed — pending Phase 1 approval
 - **Date:** 2026-11-24
 
 ## Context (why we need it)

@@ -39,7 +39,7 @@ metric definitions, quality rules).
    pipeline run starts → user sees run status per stage.
 2. **Trust the data** — User opens the run's data-quality report: rows in/out per stage, rule results
    (nulls, duplicates, negative quantities, invalid dates, cancellations), quarantined row counts.
-3. **Monitor the business** — Dashboard: revenue, orders, AOV, customers, repeat rate, top products,
+3. **Monitor the business** — Dashboard: gross/net revenue, orders, AOV, customers, repeat rate, top products,
    revenue by country, monthly trend; date-range filter. Every tile names its metric definition.
 4. **Ask a data question** — "Which 5 countries had the highest revenue in 2011?" → system shows generated SQL,
    validation status, result table/chart. Unsafe or unanswerable questions are refused with a reason.
@@ -54,13 +54,13 @@ metric definitions, quality rules).
 ### P0 — Interview-ready MVP (vertical slice)
 | ID | Feature | Acceptance criteria (summary) |
 |---|---|---|
-| P0-1 | Dataset ingestion | CSV upload (≤ 100 MB configurable) + "load sample dataset"; schema-contract check; stored immutably in Bronze with checksum; idempotent on identical re-upload |
+| P0-1 | Dataset ingestion | CSV upload (size cap configurable, default 200 MB) + "load sample dataset" (server-side, no HTTP upload); schema-contract check; stored immutably in Bronze with checksum; idempotent on identical re-upload; a batch can be deactivated |
 | P0-2 | Medallion processing | Bronze → Silver (typed, cleaned, deduplicated, standardized, quarantine) → Gold (star schema + aggregates); deterministic; re-run yields identical Gold |
 | P0-3 | Data quality validation | Declarative rules per domain; per-run report with pass/warn/fail and counts; failing *blocking* rules stop promotion to Gold |
 | P0-4 | Metrics & SQL analytics | Metric registry (≥ 8 metrics) with definitions; API to query metrics by date range/grain/dimension |
 | P0-5 | Interactive dashboard | KPI tiles, trend, top-N, breakdown; date filter; run status & DQ summary visible |
 | P0-6 | NL-to-SQL | Question → validated read-only SQL on Gold only → results + SQL shown; adversarial test suite passes |
-| P0-7 | Basic RAG assistant | Upload .md/.txt/.pdf; BM25 retrieval; answer with citations; refuses when no supporting chunk |
+| P0-7 | Basic RAG assistant | Upload .md/.txt (.pdf stretch); BM25 retrieval; answer with verified citations; returns "insufficient context" when no chunk passes the relevance gate or no valid citation remains |
 | P0-8 | Reproducible tests & docs | One-command setup and test run on Windows; README quickstart; docs current |
 
 Within P0, *organization context* exists in code (a single configured demo org), but there is **no
@@ -100,7 +100,7 @@ billing · SSO/enterprise integrations · advanced observability, backups & disa
 - FR-6 Quality rules declared in config; results stored per run; blocking vs warning severity.
 - FR-7 Metric API returns value(s) plus metric metadata (definition, unit, grain, source run id).
 - FR-8 NL-to-SQL returns: SQL, validation result, rows (≤ 1,000), execution ms, model/latency/tokens.
-- FR-9 RAG returns: answer, citations `[{n, document, chunk_id, snippet}]`, or an explicit "insufficient context".
+- FR-9 RAG returns: answer, citations `[{n, document, chunk_id, snippet}]` where `chunk_id = "{document_id}:{chunk_no}"`, or an explicit "insufficient context".
 - FR-10 All mutating actions and AI calls write audit events.
 
 ## 7. Non-functional requirements

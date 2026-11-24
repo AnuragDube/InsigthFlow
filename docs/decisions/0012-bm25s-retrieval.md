@@ -1,6 +1,6 @@
 # ADR-0012: Lexical BM25 retrieval with bm25s
 
-- **Status:** Accepted
+- **Status:** Proposed — pending Phase 1 approval
 - **Date:** 2026-11-24
 
 ## Context (why we need it)

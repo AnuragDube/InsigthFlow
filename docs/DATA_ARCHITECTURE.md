@@ -32,19 +32,18 @@ duplicate a role above with no P0 benefit.
 
 Storage layout (local disk in P0; object storage prefix in P2 — same relative layout):
 ```
-data/orgs/{org_id}/
-  bronze/{dataset}/ingest_id={uuid}/raw.csv            # original bytes, never modified
-  bronze/{dataset}/ingest_id={uuid}/data.parquet       # all columns as VARCHAR + lineage columns
-  bronze/{dataset}/ingest_id={uuid}/_manifest.json     # checksum, size, rows, received_at, contract version
-  silver/{table}/run_id={uuid}/part-*.parquet          # one directory per pipeline run
-  silver/{table}/_current                              # text file: run_id of the published version
-  gold/{table}/run_id={uuid}/part-*.parquet
-  gold/{table}/_current
-  gold/_db/gold_{run_id}.duckdb                        # Gold tables materialized for serving + NL-to-SQL
-  gold/_db/_current                                    # run_id of the published Gold DB
-  quarantine/{dataset}/run_id={uuid}/rejected.parquet  # rows rejected in Silver + reason codes
-  rag/bm25_index/                                      # retrieval index (see ARCHITECTURE §6.4)
+data/orgs/{org_id}/                                     # org_id and source_id are UUIDs — never user-supplied names
+  bronze/{source_id}/ingest_id={uuid}/raw.csv           # original bytes, never modified
+  bronze/{source_id}/ingest_id={uuid}/data.parquet      # all columns as VARCHAR + lineage columns
+  bronze/{source_id}/ingest_id={uuid}/_manifest.json    # checksum, size, rows, received_at, contract version
+  silver/{source_id}/run_id={uuid}/{table}.parquet      # one directory per pipeline run
+  quarantine/{source_id}/run_id={uuid}/rejected.parquet # rows rejected in Silver + reason codes
+  gold/{source_id}/run_id={uuid}/gold.duckdb            # Gold tables materialized for serving + NL-to-SQL
+  gold/{source_id}/run_id={uuid}/{table}.parquet        # engine-neutral export of Gold (interop, Spark parity)
+  rag/index/{version}/                                  # retrieval index (see ARCHITECTURE §6.4)
 ```
+**Which run is published is recorded only in the metadata DB** (`data_sources.published_run_id`), never by
+pointer files on disk. See §4.
 
 ### Bronze — immutable raw
 - Exactly what was received (`raw.csv`) plus a Parquet copy with **every column as text** so that type errors
@@ -54,7 +53,7 @@ data/orgs/{org_id}/
 - Retention: kept until org deletes the dataset (P2: retention policies).
 
 ### Silver — cleaned, validated, standardized (e-commerce pack)
-`silver.order_lines` from all Bronze ingestions of the dataset:
+`silver.order_lines` from all **active** Bronze ingestions of the data source (upload semantics: see §3a):
 - Cast types (`quantity INTEGER`, `unit_price DECIMAL(12,2)`, `invoice_ts TIMESTAMP`), trim strings,
   normalize country names and stock codes (upper-case, trimmed).
 - Flags: `is_cancellation` (invoice starts with `C`), `is_adjustment` (non-product stock codes such as
@@ -65,64 +64,106 @@ data/orgs/{org_id}/
   not silently dropped.
 - Missing `customer_id` is kept (valid sales) but flagged; customer-level metrics exclude them explicitly.
 
+### 3a. Upload semantics (proposed — pending product-owner approval)
+- An upload **adds a batch** (an ingestion) to the data source; Silver is rebuilt from all *active* batches.
+- A batch can be **deactivated** (excluded from future runs; Bronze bytes are kept for audit) — this is how a
+  bad upload is undone. Re-uploading identical bytes returns the existing batch.
+- Exact duplicate lines are de-duplicated **across batches** (so overlapping exports are safe), and the count
+  removed is reported. *Within* a single batch, exact duplicates are kept as a warning metric, because the
+  data cannot distinguish a genuine repeated purchase line from a duplicate — this needs your decision.
+- An upload while a run is active is stored, and a follow-up run is queued automatically when the active
+  run finishes (API returns 202 with both ids). No upload is ever stored-but-never-processed.
+
+### 3b. Time
+Source timestamps have no time zone (UK retailer). They are stored as naive timestamps and interpreted as
+`Europe/London` wall-clock time; date filters operate on the calendar date in that time. No conversion in P0.
+
 ### Gold — business-ready
 | Table | Grain | Notes |
 |---|---|---|
 | `dim_date` | day | calendar attributes |
-| `dim_customer` | customer | first/last order date, country, order count, lifetime revenue |
+| `dim_customer` | customer | first/last order date, primary country (most frequent; tie → most recent), order count, lifetime revenue |
 | `dim_product` | stock code | latest description (deterministic tie-break), first seen |
-| `fact_sales` | invoice line (non-cancelled, non-adjustment, quantity > 0, price > 0) | `revenue = quantity * unit_price` |
+| `fact_sales` | invoice line (non-cancelled, non-adjustment, quantity > 0, price > 0) | `revenue = quantity * unit_price`; carries the line's `country` (country is a property of the order line in this data, not of the customer) |
 | `fact_returns` | cancelled lines | for return-rate metrics |
 | `agg_daily_sales` | day × country | pre-aggregated for the dashboard |
-| `metric_*` views | per metric | canonical definitions exposed to NL-to-SQL |
+| `metric_*` | per metric, monthly grain | **views inside `gold.duckdb` over the materialized tables above** (no file access) — canonical definitions exposed to NL-to-SQL |
 
 ### Metric registry (deterministic definitions)
 `domains/ecommerce/metrics.yaml`, e.g.:
 ```yaml
-- name: net_revenue
-  label: Net revenue
+- name: gross_revenue
+  label: Gross revenue
   unit: GBP
   sql: SUM(revenue)
   source: fact_sales
   time_column: invoice_date
-  dimensions: [country, product, customer]
-  description: Sum of quantity × unit price for non-cancelled product lines with positive quantity and price.
-- name: average_order_value
-  sql: SUM(revenue) / NULLIF(COUNT(DISTINCT invoice_no), 0)
-- name: repeat_customer_rate     # customers with ≥2 invoices in period / customers with ≥1 (known customer_id only)
+  dimensions: [country, product]
+  description: Sum of quantity × unit price over product lines that are not cancellations or adjustments, with quantity > 0 and price > 0.
 ```
-P0 set (≥ 8): net revenue, orders, average order value, units sold, active customers, new customers,
-repeat customer rate, return rate (by value), revenue by country, top products.
+**Proposed P0 definitions — pending product-owner approval** (all within the selected date range, dates in
+the dataset's local time; see §3b):
+| Metric | Definition |
+|---|---|
+| `gross_revenue` | `SUM(quantity × unit_price)` over `fact_sales` |
+| `returns_value` | `SUM(ABS(quantity) × unit_price)` over `fact_returns` (cancellation lines) |
+| `net_revenue` | `gross_revenue − returns_value` |
+| `orders` | distinct invoices in `fact_sales` (cancellation invoices excluded) |
+| `average_order_value` | `gross_revenue / orders` |
+| `units_sold` | `SUM(quantity)` over `fact_sales` |
+| `active_customers` | distinct known `customer_id` with ≥ 1 order in the range |
+| `new_customers` | active customers whose first-ever order falls in the range |
+| `repeat_customer_rate` | of active customers, share with ≥ 2 orders **in the range** |
+| `return_rate` | `returns_value / gross_revenue` |
+| breakdowns | gross revenue by country, top products by gross revenue |
+
+Customer-level metrics exclude lines with no `customer_id` and say so in their description.
 Golden tests compute each metric by hand on a ~60-row fixture and assert exact equality.
 
 **Currency caveat:** the UCI dataset is in GBP. Multi-currency is a P2 concern (would need FX tables);
 P0 labels units explicitly and does not convert.
 
 ### Data quality rules (`quality.yaml`)
-| Rule | Stage | Severity |
-|---|---|---|
-| Required columns present | Bronze contract | blocking |
-| `invoice_ts` parseable ≥ 99% of rows | Silver | blocking |
-| `quantity`, `unit_price` numeric | Silver | blocking (row → quarantine) |
-| Duplicate-line ratio reported | Silver | warning |
-| `customer_id` null ratio ≤ 30% | Silver | warning (UCI is known to have many missing customer ids) |
-| `fact_sales.revenue` ≥ 0, no nulls in keys | Gold | blocking |
-| Row reconciliation: bronze = silver + quarantine + duplicates removed | Silver | blocking |
-| Gold revenue equals Silver eligible revenue (± 0.01) | Gold | blocking |
+Two levels, never mixed: **row-level** problems send individual rows to quarantine; **run-level** rules
+decide whether the run may be published.
+
+| Rule | Stage | Level | Severity |
+|---|---|---|---|
+| Required columns present | ingestion (contract) | file | reject upload |
+| Unparseable date / non-numeric quantity or price | Silver | row → quarantine | — |
+| Quarantined rows ≤ 1% of input | Silver | run | blocking |
+| Row reconciliation: bronze = silver + quarantined + duplicates removed | Silver | run | blocking |
+| Cross-batch duplicates removed (count) | Silver | run | warning (reported) |
+| Within-batch exact duplicates (count) | Silver | run | warning (reported) |
+| `customer_id` null ratio ≤ 30% (UCI is known to have many missing ids) | Silver | run | warning |
+| No null keys in facts/dimensions; every fact joins to its dimensions | Gold | run | blocking |
+| Gold gross revenue = Silver eligible revenue (± 0.01) | Gold | run | blocking |
 
 Thresholds are configuration, reviewed when real data is profiled in Phase 3 (not guessed as final now).
 
 ## 4. Idempotency, atomic publish and reproducibility
-- Each run writes to `.../run_id={new}/`; nothing reads that directory until publish.
-- Publish = all quality gates passed → write `_current` files via write-temp-then-`os.replace` (atomic on
-  Windows and POSIX for the same volume), then point `gold/_db/_current` at the new Gold DB file. API connections open the current file per request (cheap for DuckDB). Readers see either old or new.
-- A failed or blocked run leaves the previous published version intact and visible.
-- Same Bronze set ⇒ same Silver/Gold (deterministic SQL: explicit `ORDER BY` for tie-breaks, no `now()` in
-  models; run timestamp stored only in metadata). Tested by running twice and comparing sorted outputs.
-- Old run directories are pruned to the last N (default 3) → lightweight "time travel" for debugging.
-- **Single-writer assumption:** one pipeline run per (org, dataset) at a time, enforced by a DB-level
-  unique partial index on active runs (Postgres) / a check in the service (SQLite). This is exactly the
-  assumption Delta would remove — see next section.
+- Each run writes only into its own new `run_id={uuid}` directories; nothing reads them until published.
+- **Publish = one metadata-DB transaction** that sets `pipeline_runs.status = 'succeeded'` *and*
+  `data_sources.published_run_id = run_id`. Readers resolve the Gold DB path from `published_run_id`.
+  This avoids file-pointer swaps entirely (reviewer finding: `os.replace` fails on Windows while another
+  process has the target open, and several pointer files cannot be swapped atomically together).
+- Crash before the transaction → run stays `running`; the startup recovery sweep marks it `failed`
+  and the previous publication is untouched. Crash after → the run is already `succeeded`; nothing to fix.
+- A failed or blocked run never changes `published_run_id`.
+- Same active Bronze batches ⇒ same Silver/Gold (deterministic SQL: explicit `ORDER BY` for tie-breaks, no
+  `now()` in models; run timestamps stored only in metadata). Tested by running twice and comparing sorted outputs.
+- Old run directories are pruned **lazily** (keep the published run plus the last 2); deletion failures
+  (e.g. a file still open on Windows) are logged and retried later, never fatal.
+- **Single writer per data source**, enforced by the partial unique index `uq_one_active_run` on both
+  PostgreSQL and SQLite (SQLite supports partial indexes).
+- **One process:** P0 runs uvicorn with a single worker and without `--reload` in demo mode; the recovery
+  sweep relies on that. SQLite runs in WAL mode with `busy_timeout` so the background pipeline and API
+  requests don't hit "database is locked".
+
+**DuckDB connections:** DuckDB refuses a second connection to the same file *in the same process* if its
+configuration differs (verified, see `docs/spikes/`). Therefore **all readers of Gold — dashboard and
+NL-to-SQL alike — use one connection factory with the identical sandboxed configuration**. Opening per
+request vs caching one connection per published run is decided by measurement in Phase 4.
 
 ## 5. Where Delta Lake would add measurable value (evaluation criteria)
 | Delta capability | Do we need it in P0? | Trigger to adopt |
@@ -134,8 +175,8 @@ Thresholds are configuration, reviewed when real data is profiled in Phase 3 (no
 | Spark/Databricks interop | Yes, for the Databricks path | P1 Databricks implementation writes Delta natively |
 
 Decision: P0 Parquet only. P1 spike: write Gold with `deltalake` 1.x and read via DuckDB's `delta`
-extension; measure added complexity (extension download requires network on first use, and the NL-to-SQL
-sandbox disables extension autoloading) before adopting. See [ADR-0004](decisions/0004-delta-lake-deferred.md).
+extension; measure added complexity (extension download requires network on first use, and the Gold sandbox
+configuration disables extension autoloading) before adopting. See [ADR-0004](decisions/0004-delta-lake-deferred.md).
 
 ## 6. DuckDB ↔ PySpark parity (P1)
 - `tests/fixtures/ecommerce/` holds small CSVs with every edge case (cancellations, duplicates, nulls,
@@ -214,10 +255,12 @@ CREATE TABLE data_sources (                           -- a logical dataset, e.g.
   domain           text NOT NULL,                     -- 'ecommerce'
   kind             text NOT NULL CHECK (kind IN ('file_upload','sample','connector')),
   contract_version text NOT NULL,
+  published_run_id uuid,                             -- the one published run; set in the publish transaction
   created_by       uuid REFERENCES users(id),
   created_at       timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (org_id, id),
   UNIQUE (org_id, name)
+  -- FK (org_id, published_run_id) → pipeline_runs added after that table exists (ALTER TABLE below)
 );
 
 CREATE TABLE ingestions (
@@ -230,13 +273,15 @@ CREATE TABLE ingestions (
   row_count       bigint,
   storage_path    text NOT NULL,                      -- relative to org root, never user-controlled
   status          text NOT NULL CHECK (status IN ('received','rejected','stored')),
+  is_active       boolean NOT NULL DEFAULT true,       -- deactivated batches are excluded from runs
   rejection_reason text,
   created_by      uuid REFERENCES users(id),
   created_at      timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (org_id, id),
-  FOREIGN KEY (org_id, data_source_id) REFERENCES data_sources(org_id, id) ON DELETE CASCADE,
-  UNIQUE (org_id, data_source_id, sha256)             -- idempotent re-upload
+  FOREIGN KEY (org_id, data_source_id) REFERENCES data_sources(org_id, id) ON DELETE CASCADE
 );
+-- idempotent re-upload; rejected uploads don't block re-trying the same bytes after a contract fix
+CREATE UNIQUE INDEX uq_ingestion_bytes ON ingestions(org_id, data_source_id, sha256) WHERE status = 'stored';
 
 CREATE TABLE pipeline_runs (
   id              uuid NOT NULL,
@@ -246,7 +291,6 @@ CREATE TABLE pipeline_runs (
   status          text NOT NULL CHECK (status IN ('queued','running','succeeded','failed','blocked_by_quality')),
   engine          text NOT NULL DEFAULT 'duckdb',     -- 'duckdb' | 'spark'
   code_version    text NOT NULL,                      -- git sha → reproducibility
-  input_ingestions uuid[] NOT NULL,                   -- Bronze inputs (SQLite: JSON)
   started_at      timestamptz,
   finished_at     timestamptz,
   error_code      text,
@@ -261,10 +305,21 @@ CREATE INDEX ix_runs_source_created ON pipeline_runs(org_id, data_source_id, cre
 CREATE UNIQUE INDEX uq_one_active_run ON pipeline_runs(org_id, data_source_id)
   WHERE status IN ('queued','running');              -- single-writer guarantee
 
+ALTER TABLE data_sources ADD FOREIGN KEY (org_id, published_run_id) REFERENCES pipeline_runs(org_id, id);
+
+CREATE TABLE pipeline_run_inputs (                    -- which Bronze batches a run consumed (lineage)
+  org_id        uuid NOT NULL,
+  run_id        uuid NOT NULL,
+  ingestion_id  uuid NOT NULL,
+  PRIMARY KEY (org_id, run_id, ingestion_id),
+  FOREIGN KEY (org_id, run_id) REFERENCES pipeline_runs(org_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (org_id, ingestion_id) REFERENCES ingestions(org_id, id) ON DELETE CASCADE
+);
+
 CREATE TABLE pipeline_stage_runs (
   org_id       uuid NOT NULL,
   run_id       uuid NOT NULL,
-  stage        text NOT NULL CHECK (stage IN ('bronze','silver','gold','publish')),
+  stage        text NOT NULL CHECK (stage IN ('silver','silver_quality','gold','gold_quality','publish')),
   status       text NOT NULL,
   rows_in      bigint, rows_out bigint, rows_quarantined bigint,
   started_at   timestamptz, finished_at timestamptz,
@@ -281,7 +336,7 @@ CREATE TABLE quality_results (
   passed      boolean NOT NULL,
   observed    numeric, threshold numeric,
   details     jsonb NOT NULL DEFAULT '{}',
-  PRIMARY KEY (org_id, run_id, rule_id),
+  PRIMARY KEY (org_id, run_id, stage, rule_id),
   FOREIGN KEY (org_id, run_id) REFERENCES pipeline_runs(org_id, id) ON DELETE CASCADE
 );
 
@@ -298,9 +353,10 @@ CREATE TABLE documents (
   uploaded_by   uuid REFERENCES users(id),
   created_at    timestamptz NOT NULL DEFAULT now(),
   deleted_at    timestamptz,
-  PRIMARY KEY (org_id, id),
-  UNIQUE (org_id, sha256)
+  PRIMARY KEY (org_id, id)
 );
+-- allows re-uploading a document after it was deleted
+CREATE UNIQUE INDEX uq_document_bytes ON documents(org_id, sha256) WHERE deleted_at IS NULL;
 
 CREATE TABLE document_access (                        -- only consulted when visibility = 'restricted'
   org_id       uuid NOT NULL,
@@ -368,16 +424,18 @@ CREATE TABLE ml_models (                              -- P1
   created_at      timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (org_id, id),
   UNIQUE (org_id, kind, version),
-  FOREIGN KEY (org_id, training_run_id) REFERENCES pipeline_runs(org_id, id)
+  FOREIGN KEY (org_id, training_run_id) REFERENCES pipeline_runs(org_id, id) ON DELETE CASCADE
 );
 CREATE UNIQUE INDEX uq_one_active_model ON ml_models(org_id, kind) WHERE status = 'active';
 ```
 
-**Validation performed (2026-11-24):** this DDL (plus `CREATE EXTENSION citext`) was applied to a local
+**Validation performed (2026-11-24) on the first draft:** the DDL (plus `CREATE EXTENSION citext`) was applied to a local
 PostgreSQL 16 instance: 17 tables created without errors. Constraint checks run by hand: a membership pointing
 at another org's role, and a pipeline run pointing at another org's data source, were both rejected by the
 composite FKs; a second `queued/running` run for the same data source was rejected by `uq_one_active_run`.
-These checks become automated migration tests in the metadata phase.
+The schema was revised after review (publish pointer, run inputs table, partial unique indexes); the revised
+version was re-applied to PostgreSQL 16 the same day (18 tables, no errors); its constraint checks are
+re-run as automated migration tests in Phase 2. Evidence: `docs/spikes/postgres_schema_check.sql`.
 
 ### Organization isolation strategy (layered)
 1. **Request context:** org comes from the principal (P1) / demo config (P0), never from client input.
@@ -392,6 +450,6 @@ These checks become automated migration tests in the metadata phase.
 
 ### SQLite compatibility notes (local dev)
 `uuid` → stored as 36-char text via SQLAlchemy `Uuid`; `jsonb` → `JSON`; `citext` → `COLLATE NOCASE`;
-`uuid[]` → JSON array; partial unique indexes are supported by SQLite. Alembic migrations are written once
+partial unique indexes are supported by SQLite and are used on both databases. Alembic migrations are written once
 with SQLAlchemy types; Postgres-only features (RLS, citext) live in Postgres-only migration branches.
 CI runs the metadata tests against both SQLite and PostgreSQL from P1 onward.

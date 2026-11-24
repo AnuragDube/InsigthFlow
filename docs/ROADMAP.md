@@ -52,18 +52,22 @@ metadata, ai.llm, core}`; `domains` is data read by pipeline/quality/analytics/n
 
 ## 3. Roadmap A — Interview-ready MVP (Tue 24 → Fri 27 Nov)
 
-Each phase ends with tests run, a report, a git bundle for you to push, and **your approval**. To fit the
-deadline, approval turnaround needs to be short; phases are sized ~3–5 hours of build time each.
+Each phase ends with tests run, a report, a git bundle for you to push, and **your approval**.
+**Honest capacity check:** six build phases of ~3–5 h each plus review/approval time is roughly 2.5 days of
+continuous work. It fits only if approvals come back quickly. Recommended: merge Phases 2 and 3 under a
+single approval gate (foundations alone have little to review), and treat Phase 6 (RAG) as the first
+candidate to shrink, because the interview is for an **Associate Analyst** role — metrics, SQL and data
+quality are the core of the story; RAG is depth.
 
 | Phase | Target | Scope | Demo value |
 |---|---|---|---|
 | **1** Product & architecture | Tue 24 | These docs + ADRs | Talk track for system design questions |
 | **2** Foundations | Wed 25 AM | Scaffold (uv, FastAPI app factory, settings, logging, problem+json errors, `/health`), metadata models for orgs/data_sources/ingestions/pipeline_runs/quality_results/audit (SQLite + Alembic), fixtures, CI workflow | "Production-minded foundations" |
-| **3** Ingestion + Medallion + Quality | Wed 25 | CSV ingest → Bronze; Silver/Gold SQL models; quality rules; atomic publish; golden-fixture tests; real UCI run with **measured** timings | Core data-engineering story |
+| **3** Ingestion + Medallion + Quality | Wed 25 | CSV ingest → Bronze; Silver/Gold SQL models; quality rules; transactional publish; golden-fixture tests; UCI xlsx → CSV conversion script; real UCI run with **measured** timings. Needs: UCI download (host blocked here — network request or manual download) | Core data-engineering story |
 | **4** Metrics API + Dashboard | Wed 25 PM → Thu 26 AM | metric registry, metric/overview endpoints, React dashboard (KPIs, trend, top products, country breakdown, run + DQ status) | The visible "wow" |
-| **5** NL-to-SQL | Thu 26 | Validator (TDD with adversarial corpus), sandbox executor, Groq provider + fake provider, UI panel showing SQL | AI + security story |
-| **6** RAG assistant | Thu 26 PM | md/txt/pdf upload, chunking, bm25s, cited answers, refusal path, UI | RAG story |
-| **7** Demo hardening | Thu 26 night / Fri AM | Playwright happy-path e2e, `/security-review`, README quickstart, demo script, offline demo mode, screen recording | Reliability on the day |
+| **5** NL-to-SQL | Thu 26 | Validator (TDD with ~15–20 adversarial cases), sandbox executor, Groq provider + fake provider, UI panel showing SQL. Needs: Groq API key + network access to `api.groq.com` | AI + security story |
+| **6** RAG assistant | Thu 26 PM | md/txt upload (PDF stretch), chunking, bm25s, cited answers, refusal path, UI | RAG story |
+| **7** Demo hardening | Thu 26 night / Fri AM | Playwright happy-path e2e (run locally; CI later), `/security-review`, README quickstart, demo script, offline demo mode, screen recording. Public read-only deployment only if time remains | Reliability on the day |
 
 **Cut line (decided now, not under pressure):** if Phase 5 isn't done by Thu 26 noon →
 RAG drops PDF support (md/txt only); dashboard limited to 4 KPIs + 2 charts; no public deployment before
@@ -133,7 +137,19 @@ checklist provided · open issues listed.
 | 6 | Cited answer + refusal tests pass; deleted document not retrievable (tested); hit@k on small eval reported |
 | 7 | Playwright e2e passes; `/security-review` findings resolved or recorded; README quickstart verified on your Windows machine; demo rehearsed with timing |
 
-## 8. Interview value map
+## 8. Phase 1 review log
+An independent review of these docs (2026-11-24) raised 5 high, 8 medium and 8 low findings. Resolved in
+the docs: transactional publish via `published_run_id` instead of pointer files (Windows `os.replace`
+issue); single sandboxed DuckDB connection config for all Gold readers (DuckDB rejects mixed configs —
+verified); spike evidence committed under `docs/spikes/`; quality rules split into row-level quarantine vs
+run-level gates; localhost CSRF/DNS-rebinding hardening; plain-text AI output to close Markdown-image
+exfiltration; RAG ACL-before-ranking, calibrated relevance gate, versioned index; `WITH RECURSIVE`
+banned and cost attacks assigned to timeouts; schema fixes (run inputs table, stage values, partial unique
+indexes, publish pointer, cascade rules); scope trims (PDF stretch, no circuit breaker, Playwright local).
+**Open for the product owner:** upload semantics, metric definitions, within-batch duplicates, RAG priority,
+approval cadence, Groq key timing (see the Phase 1 report).
+
+## 9. Interview value map
 | Area | Where it shows up | What you can explain |
 |---|---|---|
 | Python | FastAPI services, typed DTOs, provider protocol, tests | Interfaces, dependency injection, async I/O for LLM calls, error handling |

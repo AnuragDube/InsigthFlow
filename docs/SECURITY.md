@@ -6,11 +6,19 @@ Status: Draft for approval (Phase 1) · Last updated: 2026-11-24
 
 | Phase | Posture | Allowed exposure |
 |---|---|---|
-| P0 (interview MVP) | No authentication. Single configured demo org. All other controls below that don't depend on identity are implemented. | **Localhost only** (binds `127.0.0.1`). Optional public demo only in `PUBLIC_DEMO_MODE=read_only`: uploads, document upload and pipeline triggers disabled; bundled data only; NL/RAG rate-limited. |
+| P0 (interview MVP) | No authentication. Single configured demo org. All other controls below that don't depend on identity are implemented, including localhost hardening (§1a). | **Localhost only** (binds `127.0.0.1`). Optional public demo only in `PUBLIC_DEMO_MODE=read_only`: uploads, document upload and pipeline triggers disabled; bundled data only; NL/RAG rate-limited. |
 | P1 | Authentication, RBAC, org-scoped repositories with cross-org tests, audit trail. | Private beta with invited users on free infra — not for paying customers. |
 | P2 | Postgres RLS, security headers/CSP review, dependency & secret scanning gates, backups, incident runbook, external pen-test (when funded). | Public multi-tenant SaaS. |
 
 The platform must not be described as "enterprise production-ready" before P2 evidence exists.
+
+### 1a. Localhost hardening (P0)
+An unauthenticated API on `127.0.0.1` can still be attacked *through the user's browser*: any web page can
+send a multipart POST (no CORS preflight) or use DNS rebinding. Therefore, in P0:
+- `TrustedHostMiddleware` allows only `localhost`/`127.0.0.1` Host headers (defeats DNS rebinding).
+- Every mutating request must carry a custom header (`X-InsightFlow-Client: web`) — a cross-site form or
+  simple request cannot set it without a CORS preflight, which strict CORS (frontend origin only) denies.
+- CORS: explicit frontend origin only, no wildcard, no credentials in P0.
 
 ## 2. Assets
 Customer business data (Bronze/Silver/Gold), uploaded documents, credentials and API keys, user accounts,
@@ -40,7 +48,7 @@ audit trail integrity, LLM quota (an abusable cost/availability asset even when 
 | T11 | Malicious files | Zip bombs, path traversal names, PDF exploits, CSV formula injection | Server-generated storage paths; extension + MIME sniff allowlist; size and page limits on PDF parsing; formula-prefix escaping on any CSV export | P0 |
 | T12 | Secret leakage | API key committed or logged | env-only secrets, `.env` gitignored, `.env.example`, gitleaks in CI, log redaction filter for `Authorization`/key patterns | P0 |
 | T13 | Supply chain | Malicious/compromised dependency | Lockfiles, minimal deps, Dependabot alerts (free), `pip-audit`/`npm audit` in CI | P0/P1 |
-| T14 | XSS via AI output | LLM answer containing `<script>` | Render AI text as plain text/sanitized Markdown (no raw HTML); React escapes by default; CSP | P0 |
+| T14 | XSS / exfiltration via AI output | LLM answer containing `<script>` or a Markdown image whose URL carries document text | AI text rendered as **plain text** with citation chips (no Markdown images, no auto-loaded links, no raw HTML); React escapes by default; CSP `default-src 'self'; img-src 'self' data:; connect-src 'self'` | P0 |
 | T15 | Data exposure to LLM provider | Customer data sent to third party | NL-to-SQL sends schema + metric definitions only, not rows; RAG sends retrieved chunks only; documented in privacy notes; Groq states it does not retain inference data by default (verify before commercial use) | P0 |
 
 ## 5. Generated-SQL defence in depth
@@ -49,10 +57,10 @@ LLM output is treated exactly like SQL typed by an anonymous attacker.
 
 **Layer 1 — Static validation (sqlglot AST, DuckDB dialect)**
 - Exactly one statement (sqlglot returns >1 for `select 1; drop table x` — verified).
-- Root must be `SELECT` (incl. `UNION`/`WITH ... SELECT`). Reject any `Insert/Update/Delete/Create/Drop/
+- Root must be `SELECT` (incl. `UNION`/`WITH ... SELECT`). `WITH RECURSIVE` is rejected. Reject any `Insert/Update/Delete/Create/Drop/
   Alter/Copy/Attach/Pragma/Set/Command/Transaction` node anywhere in the tree.
-- Every table reference must be in the **Gold allowlist** for the domain (`fact_sales`, `dim_*`, `agg_*`,
-  `metric_*`). CTE names are tracked so they are allowed as references.
+- Every table reference must be in the **Gold allowlist** for the domain (`fact_sales`, `fact_returns`,
+  `dim_*`, `agg_*`, `metric_*`). CTE names are tracked so they are allowed as references.
 - **Table functions rejected:** sqlglot represents `read_parquet('x')` as a table with an empty name plus a
   `ReadParquet` function node (verified with sqlglot 30.34.0) → reject any table without an allowlisted
   name and any function in a denylist (`read_*`, `*_scan`, `glob`, `query`, `query_table`, `getenv`,
@@ -67,32 +75,41 @@ Open the org's `gold.duckdb` with `read_only=True` and config
 lock_configuration=true`, plus `memory_limit` and `threads` set before locking.
 Verified on DuckDB 2.0.1 (2026-11-24 spike): with these settings, `read_csv(<file>)`, `INSERT`,
 `SET enable_external_access=true`, `ATTACH`, `INSTALL httpfs` and `COPY ... TO` were all rejected.
-**Gold is materialized as tables inside each org's `gold_{run_id}.duckdb`** (not views over Parquet), so the
+**Gold is materialized as tables inside each org's per-run `gold.duckdb`** (not views over Parquet), so the
 sandbox needs *no* filesystem access at all. Verified 2026-11-24 on DuckDB 2.0.1: a view over Parquet fails
 under `enable_external_access=false` (PermissionException), while materialized tables work. Alternative
 also verified: `SET allowed_directories=['<org>/gold/']` before disabling external access lets views resolve,
 blocks reads outside that directory, and cannot be changed after `lock_configuration`. We choose
-materialization because the boundary is simpler (no file reads at all) and Gold is small (aggregated).
+materialization because the boundary is simpler (no file reads at all). Size: `fact_sales` is line-level
+(~1 M rows for the UCI sample); the resulting file size is measured in Phase 3, not assumed.
+
+**Shared configuration:** DuckDB refuses a second same-process connection to a file with a different
+configuration (verified), so the dashboard also reads Gold through this same sandboxed configuration.
+This is a feature: there is only one way to read Gold, and it is the locked-down one.
 
 **Layer 3 — Resource limits:** statement timeout via a timer calling `connection.interrupt()`, row cap,
-memory limit, one concurrent NL query per org.
+memory limit, one concurrent NL query per org. This layer — not the validator — handles expensive-but-valid
+queries such as cross-join explosions.
 
 **Layer 4 — Transparency & audit:** SQL is shown to the user; every execution (SQL text, validation
 outcome, duration, row count) is audited.
 
-**Test suite:** an adversarial corpus (≥ 30 cases: stacked queries, comments hiding statements, case/
-quoting tricks, table functions, catalog access, PRAGMA, recursive CTE bombs, cross-join explosions,
-unicode homoglyph identifiers) must be 100% blocked by layer 1, and a subset re-run against layer 2 alone
-(validator bypassed) to prove the sandbox holds independently.
+**Test suite:** an adversarial corpus (~15–20 strong cases: stacked queries, comments hiding statements,
+case/quoting tricks, table functions, catalog access, PRAGMA/SET/ATTACH/COPY, `WITH RECURSIVE`, DML/DDL,
+unicode homoglyph identifiers) must be 100% blocked by layer 1; the file/DDL subset is re-run against
+layer 2 alone (validator bypassed) to prove the sandbox holds independently; a cross-join explosion test
+must be stopped by layer 3's timeout. Grows over time.
 
 ## 6. Prompt-injection & document security
 - Documents and their chunks are untrusted. They are inserted inside clearly delimited `<source id=n>` blocks
   with an instruction that sources are data, not instructions. This *reduces* but does **not eliminate**
-  prompt injection — so the design assumes injection may succeed and limits impact:
+  prompt injection — so the design assumes injection may succeed and limits impact. Residual risk: an
+  injected document can still distort the answer text shown to a user of the same org:
   - RAG path has no tools, no SQL, no network, no access to other orgs' indexes, no secrets in the prompt.
   - Retrieval is per-org index + document ACL filter **before** text reaches the prompt.
   - Citations are verified against retrieved chunk ids; uncited answers are labelled unverified.
-  - Output rendered without HTML.
+  - Output rendered as plain text: no HTML, no Markdown images or auto-fetched links (closes the
+    "image URL carries data to an attacker" exfiltration channel), plus CSP `img-src 'self'`.
 - NL-to-SQL never sees document content; RAG never executes SQL. The two paths are not chained in P0.
 - Document access control: `visibility = org | restricted`; restricted documents are filtered by the
   caller's roles in the retrieval step (P1, with auth). Deleting a document removes chunks and rebuilds
