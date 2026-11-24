@@ -7,11 +7,11 @@ from typing import Any
 import duckdb
 import pytest
 import yaml
+from pipeline_helpers import FIX, ingest_fixtures, setup_source
 
 from insightflow.core.settings import Settings
 from insightflow.domains.loader import load_domain_pack
 from insightflow.pipeline.silver import SilverStats, build_silver
-from pipeline_helpers import FIX, ingest_fixtures, setup_source
 
 EXPECTED: dict[str, Any] = yaml.safe_load((FIX / "expected.yaml").read_text("utf-8"))
 
