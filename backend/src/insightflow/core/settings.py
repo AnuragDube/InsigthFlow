@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     trusted_hosts: list[str] = ["localhost", "127.0.0.1", "testserver"]
     duckdb_memory_limit: str = "2GB"
     duckdb_threads: int = 4
+    code_version: str = "dev"  # set to the git SHA in deployments (reproducibility)
 
 
 @lru_cache
