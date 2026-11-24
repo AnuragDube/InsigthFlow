@@ -1,11 +1,12 @@
 # Project status — read this first when resuming
 
-Last updated: 2026-11-24 19:20 UTC (Wed 25 Nov, 00:50 IST) · Updated by: Claude Code (lead engineer)
+Last updated: 2026-11-24 19:30 UTC (Wed 25 Nov, 01:00 IST) · Updated by: Claude Code (lead engineer)
 
 ## Where we are
 - **Phase 1 (architecture): approved 2026-11-24.**
-- **M1 = Phases 2+3 "Data foundation": implemented on branch `m1-data-foundation`** — final
-  independent review and `/security-review` in progress (see "Current task").
+- **M1 = Phases 2+3 "Data foundation": complete on branch `m1-data-foundation`** (94 tests).
+  Independent review: 0 critical; 3 important + 2 re-graded findings fixed with regression tests.
+  `/security-review`: no findings. Waiting for the owner to push the bundle.
 - Next: **M2 = Phase 4** — metric registry + metrics API + React dashboard.
 - Working title per handover: "Data Intelligence Platform"; `InsightFlow`/`insightflow` remain the
   repo and package identifiers.
@@ -28,8 +29,17 @@ Last updated: 2026-11-24 19:20 UTC (Wed 25 Nov, 00:50 IST) · Updated by: Claude
 | **Not yet verified on the owner's Windows laptop** | everything above — CI includes a Windows job once pushed |
 
 ## Current task
-Final whole-branch review of M1 (independent reviewer), then fix Critical/Important findings with
-tests, run `/security-review`, then hand off a git bundle of `m1-data-foundation`.
+M1 handed off as a git bundle. Next: plan M2 (Phase 4: metric registry, metrics API, React dashboard).
+
+## Known minor issues (deferred from M1 review)
+- Revenue reconciliation rule reuses Silver flags (not fully independent of fact eligibility).
+- Bronze lacks `_source_file`/`_ingested_at` lineage columns; manifest lacks `received_at`.
+- Country names only trimmed, not normalized.
+- `load-sample` queues a run even when all files were already ingested.
+- A deleted published Gold file surfaces as 500 instead of a problem response.
+- CSV header read uses an unbounded `readline()` (bounded by the upload cap).
+- Product decisions pending: Excel-style dates (`12/1/2010 8:26`) are quarantined; re-uploading a
+  deactivated batch keeps it inactive.
 
 ## Owner decisions
 - 2026-11-24: Owner delegated full technical ownership. Accepted defaults: Phase 1 architecture incl.
