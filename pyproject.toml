@@ -24,7 +24,7 @@ packages = ["backend/src/insightflow"]
 
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]
-pythonpath = ["backend/src"]
+pythonpath = ["backend/src", "backend/tests"]
 addopts = "-q"
 filterwarnings = [
     "error",
