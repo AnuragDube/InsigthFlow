@@ -5,29 +5,30 @@ Bronze → Silver → Gold pipeline with data-quality gates, explore determinist
 ask questions in plain English (answered with visible, validated SQL), and query your documents with
 cited answers. First domain: e-commerce analytics.
 
-> **Status:** M1 "data foundation" — backend ingestion, Bronze/Silver/Gold pipeline, quality gates and
-> API work and are tested; no frontend yet. This is an MVP under active development, **not**
-> production-ready, and has **no authentication**: run it on localhost only. See [docs/STATUS.md](docs/STATUS.md).
+> **Status:** M2 — data pipeline, quality gates, metric registry, metrics API and React dashboard work
+> and are tested. AI features (plain-English questions, document assistant) are next. MVP, **not**
+> production-ready, **no authentication**: run on localhost only. See [docs/STATUS.md](docs/STATUS.md).
+
+![Dashboard overview on the UCI Online Retail II sample](docs/images/dashboard-overview.png)
 
 ## Quickstart (Windows 11, PowerShell)
-Prerequisites: [uv](https://docs.astral.sh/uv/) (it installs Python 3.12 itself) and git.
+Prerequisites: [uv](https://docs.astral.sh/uv/) (installs Python 3.12 itself), Node.js 22, git.
 
 ```powershell
 git clone https://github.com/AnuragDube/InsigthFlow.git
 cd InsigthFlow
-uv sync                                            # create .venv with pinned dependencies
-uv run pytest                                      # run the test suite
-uv run python scripts/fetch_sample_data.py         # download + convert UCI sample (~45 MB, ~1 min)
+uv sync                                         # backend dependencies (pinned)
+uv run pytest                                   # backend tests
+uv run python scripts/fetch_sample_data.py      # UCI sample: ~45 MB download, ~1 min
+cd frontend; npm ci; npm test; npm run build; cd ..
+$env:INSIGHTFLOW_FRONTEND_DIST = "frontend/dist"
 uv run uvicorn insightflow.api.app:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
-Then open http://127.0.0.1:8000/docs (interactive API) and, in that page or with curl:
-1. `POST /api/v1/datasets` with `{"name": "UCI Online Retail II"}`
-2. `POST /api/v1/datasets/{id}/load-sample`
-3. `GET /api/v1/pipeline-runs/{run_id}` (stages, timings) and `/quality` (data-quality report)
+Open http://127.0.0.1:8000 and choose **Load sample data**. The first run takes a few seconds.
 
-Mutating requests need the header `X-InsightFlow-Client: web` (a CSRF guard; the docs page does not
-add it, so use curl or the `Invoke-RestMethod` examples in [docs/STATUS.md](docs/STATUS.md)).
+For frontend development with hot reload, run the API as above and `npm run dev` in `frontend/`
+(http://localhost:5173, proxies `/api`). End-to-end tests: `npm run e2e` in `frontend/`.
 
 Quality gate before committing (Git Bash / Linux / macOS): `scripts/check.sh`.
 

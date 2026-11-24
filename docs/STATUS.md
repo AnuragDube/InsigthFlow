@@ -1,13 +1,17 @@
 # Project status — read this first when resuming
 
-Last updated: 2026-11-24 19:30 UTC (Wed 25 Nov, 01:00 IST) · Updated by: Claude Code (lead engineer)
+Last updated: 2026-11-24 19:55 UTC (Wed 25 Nov, 01:25 IST) · Updated by: Claude Code (lead engineer)
 
 ## Where we are
 - **Phase 1 (architecture): approved 2026-11-24.**
 - **M1 = Phases 2+3 "Data foundation": complete on branch `m1-data-foundation`** (94 tests).
   Independent review: 0 critical; 3 important + 2 re-graded findings fixed with regression tests.
   `/security-review`: no findings. Waiting for the owner to push the bundle.
-- Next: **M2 = Phase 4** — metric registry + metrics API + React dashboard.
+- **M2 = Phase 4 "Metrics & dashboard": built on branch `m2-dashboard`** (branched from M1):
+  metric registry (10 metrics in `metrics.yaml`), dashboard/series/breakdown API, React dashboard
+  (Overview + Data pages) served same-origin with CSP. 119 backend + 13 frontend unit tests,
+  Playwright e2e on desktop and phone. Final independent review in progress.
+- Next: **M3 = Phase 5** — NL-to-SQL (needs Groq key + network access to `api.groq.com`).
 - Working title per handover: "Data Intelligence Platform"; `InsightFlow`/`insightflow` remain the
   repo and package identifiers.
 - Interview: Fri 27 Nov 2026 (Associate Analyst). RAG is the first thing cut if time runs short.
@@ -26,10 +30,15 @@ Last updated: 2026-11-24 19:30 UTC (Wed 25 Nov, 01:00 IST) · Updated by: Claude
 | Sandboxed read-only Gold reader (11 escape attempts blocked) | `backend/tests/security/test_gold_sandbox.py` |
 | HTTP API: datasets, uploads, load-sample, batch (de)activation, runs, quality | `test_api_datasets.py` |
 | Real UCI run: 1,067,371 lines → published Gold in ≈3.2 s; overlap 22,523 removed; reruns identical | `docs/DATA_PROFILE.md` (Linux container) |
+| Metric registry + compiler (hand-computed golden values) | `test_metrics.py`, `test_api_analytics.py` |
+| React dashboard: Overview/Data, empty states, CSRF header, formatting | `frontend/src/**/*.test.tsx`, `frontend/e2e/dashboard.spec.ts` |
+| SPA served same-origin; CSP + security headers; traversal-safe | `test_static.py` |
+| Screenshots of the real UCI dashboard | `docs/images/` |
 | **Not yet verified on the owner's Windows laptop** | everything above — CI includes a Windows job once pushed |
 
 ## Current task
-M1 handed off as a git bundle. Next: plan M2 (Phase 4: metric registry, metrics API, React dashboard).
+M2 final review → fix verified findings → bundle (`m1-data-foundation` + `m2-dashboard`).
+Owner action pending: push the M1 bundle (session cannot push to GitHub).
 
 ## Known minor issues (deferred from M1 review)
 - Revenue reconciliation rule reuses Silver flags (not fully independent of fact eligibility).
