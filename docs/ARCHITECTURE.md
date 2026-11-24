@@ -166,22 +166,29 @@ sandbox as NL-to-SQL, but should be gated by an `analytics:sql` permission, whic
 ```python
 class LLMProvider(Protocol):
     name: str
+
     async def complete(self, req: CompletionRequest) -> CompletionResult: ...
+
 
 @dataclass(frozen=True)
 class CompletionRequest:
-    messages: list[Message]          # system/user/assistant
-    model: str                       # from settings, never hardcoded in callers
+    messages: list[Message]  # system/user/assistant
+    model: str  # from settings, never hardcoded in callers
     max_tokens: int
     temperature: float = 0.0
-    json_mode: bool = False          # response_format={"type":"json_object"} when supported
-    feature: str = ""                # "nl2sql" | "rag" — for logging/quotas
+    json_mode: bool = False  # response_format={"type":"json_object"} when supported
+    feature: str = ""  # "nl2sql" | "rag" — for logging/quotas
+
 
 @dataclass(frozen=True)
 class CompletionResult:
-    text: str; model: str; provider: str
-    prompt_tokens: int | None; completion_tokens: int | None
-    latency_ms: int; request_id: str | None
+    text: str
+    model: str
+    provider: str
+    prompt_tokens: int | None
+    completion_tokens: int | None
+    latency_ms: int
+    request_id: str | None
 ```
 Implementations:
 - `OpenAICompatibleProvider(base_url, api_key, ...)` — plain `httpx`; Groq is configured as
