@@ -47,8 +47,11 @@ export function Data({ datasetId }: { datasetId: string }) {
     refetchInterval: (q) => (q.state.data?.items.some((r) => ACTIVE.has(r.status)) ? 1500 : false),
   });
   const runId = selected ?? runs.data?.items[0]?.id ?? null;
+  const runStatus = runs.data?.items.find((r) => r.id === runId)?.status;
   const quality = useQuery({
-    queryKey: ["quality", runId],
+    // Status is part of the key: results fetched while a run was still queued are empty and must
+    // not be reused once it finishes (found by the e2e test).
+    queryKey: ["quality", runId, runStatus],
     queryFn: () => api.quality(runId as string),
     enabled: Boolean(runId),
   });
