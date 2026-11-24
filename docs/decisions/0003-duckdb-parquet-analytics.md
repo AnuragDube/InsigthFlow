@@ -1,6 +1,6 @@
 # ADR-0003: DuckDB + Parquet as the analytical engine and storage
 
-- **Status:** Proposed — pending Phase 1 approval
+- **Status:** Accepted 2026-11-24
 - **Date:** 2026-11-24
 
 ## Context (why we need it)

@@ -1,6 +1,6 @@
 # ADR-0009: Deterministic metric registry (lightweight semantic layer)
 
-- **Status:** Proposed — pending Phase 1 approval
+- **Status:** Accepted 2026-11-24
 - **Date:** 2026-11-24
 
 ## Context (why we need it)

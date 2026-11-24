@@ -1,6 +1,6 @@
 # ADR-0002: Python 3.12, FastAPI and uv
 
-- **Status:** Proposed — pending Phase 1 approval
+- **Status:** Accepted 2026-11-24
 - **Date:** 2026-11-24
 
 ## Context (why we need it)

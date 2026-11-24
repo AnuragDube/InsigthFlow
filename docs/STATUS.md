@@ -3,7 +3,7 @@
 Last updated: 2026-11-24 18:55 UTC (Wed 25 Nov, 00:25 IST) · Updated by: Claude Code (lead engineer)
 
 ## Where we are
-- **Phase 1 (architecture): docs complete, awaiting owner approval.** No application code exists yet.
+- **Phase 1 (architecture): approved 2026-11-24.** Now on M1 (Phases 2+3).
 - Orchestration transferred from ChatGPT on 2026-11-24 ([handover](handover/2026-11-24-chatgpt-handover.md)).
   Its appendix was identical to the repo docs; its preamble's open issues were reconciled (see below).
 - Working title per handover: "Data Intelligence Platform". `InsightFlow`/`insightflow` remain the
@@ -31,11 +31,12 @@ Last updated: 2026-11-24 18:55 UTC (Wed 25 Nov, 00:25 IST) · Updated by: Claude
 - RAG: citation validity ≠ faithfulness → sentence/citation term-overlap check + manual faithfulness eval.
 - Public demo: no unrestricted quota-consuming AI endpoint; public/synthetic data only; owner approval required.
 
-## Decisions pending from the owner (blocking)
-1. Approve Phase 1 architecture (including React over Streamlit) — or request changes.
-2. Approve operating cadence: combined Phase 2+3 gate; routine engineering inside approved scope without asking.
-3. Confirm ADR-0017 upload semantics and the metric definitions table (DATA_ARCHITECTURE §3).
-4. Confirm interview date/priority; RAG is the first thing cut if time runs short.
+## Owner decisions
+- 2026-11-24: Owner delegated full technical ownership ("take decisions on your own"). Accepted defaults:
+  Phase 1 architecture incl. React; ADR-0001…0017 Accepted (0016 auth still decided at P1 start);
+  ADR-0017 upload semantics; metric definitions as proposed (sign conventions verified in Phase 3);
+  Phases 2+3 = one milestone; interview Fri 27 Nov, RAG first to cut.
+- Still escalated to owner: spending, credentials, external deployment, destructive actions.
 
 ## Next milestone (proposed): M1 = Phase 2 + 3 "Data foundation"
 See the latest report in conversation / ROADMAP §3. Starts only after decisions 1–2.

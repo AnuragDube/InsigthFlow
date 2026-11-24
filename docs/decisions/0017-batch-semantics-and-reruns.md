@@ -1,6 +1,6 @@
 # ADR-0017: Batch semantics, multiplicity rule and durable re-runs
 
-- **Status:** Proposed — pending owner confirmation
+- **Status:** Accepted 2026-11-24
 - **Date:** 2026-11-24
 
 ## Context (why we need it)

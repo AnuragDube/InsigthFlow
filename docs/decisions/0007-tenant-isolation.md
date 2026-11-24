@@ -1,6 +1,6 @@
 # ADR-0007: Organization-aware data ownership from day one
 
-- **Status:** Proposed — pending Phase 1 approval
+- **Status:** Accepted 2026-11-24
 - **Date:** 2026-11-24
 
 ## Context (why we need it)

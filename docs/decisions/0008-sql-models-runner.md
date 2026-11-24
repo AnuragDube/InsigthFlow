@@ -1,6 +1,6 @@
 # ADR-0008: Transformations as SQL model files with a small Python runner
 
-- **Status:** Proposed — pending Phase 1 approval
+- **Status:** Accepted 2026-11-24
 - **Date:** 2026-11-24
 
 ## Context (why we need it)

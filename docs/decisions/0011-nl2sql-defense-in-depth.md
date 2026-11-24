@@ -1,6 +1,6 @@
 # ADR-0011: NL-to-SQL with validation and sandboxed read-only execution
 
-- **Status:** Proposed — pending Phase 1 approval
+- **Status:** Accepted 2026-11-24
 - **Date:** 2026-11-24
 
 ## Context (why we need it)

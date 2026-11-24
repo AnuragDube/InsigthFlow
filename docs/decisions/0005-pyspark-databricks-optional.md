@@ -1,6 +1,6 @@
 # ADR-0005: PySpark on Databricks Free Edition as an optional parity implementation
 
-- **Status:** Proposed — pending Phase 1 approval (implementation in P1)
+- **Status:** Accepted 2026-11-24 (implementation in P1)
 - **Date:** 2026-11-24
 
 ## Context (why we need it)

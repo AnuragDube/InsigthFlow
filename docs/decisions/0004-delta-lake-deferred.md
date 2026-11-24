@@ -1,6 +1,6 @@
 # ADR-0004: Delta Lake deferred; Parquet with atomic publish in P0
 
-- **Status:** Proposed — pending Phase 1 approval
+- **Status:** Accepted 2026-11-24
 - **Date:** 2026-11-24
 
 ## Context (why we need it)
