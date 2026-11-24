@@ -20,3 +20,4 @@ Format: Context · Decision · Alternatives · Limitations · Revisit when. New 
 | [0014](0014-demo-dataset.md) | Demo dataset: UCI Online Retail II plus synthetic fixtures | Proposed |
 | [0015](0015-free-deployment.md) | Local-first demo; optional stateless read-only public demo | Proposed |
 | [0016](0016-authentication.md) | Authentication approach (built-in vs hosted) | Proposed (decide in P1) |
+| [0017](0017-batch-semantics-and-reruns.md) | Batch semantics, multiplicity rule and durable re-runs | Proposed |

@@ -1,7 +1,9 @@
 # InsightFlow — durable project rules
 
 Modular-monolith Data & AI intelligence platform. First domain: e-commerce analytics.
+**Resume from `docs/STATUS.md`** (current phase, pending decisions, blockers) and keep it updated each milestone.
 Detailed design lives in `docs/` (start at `docs/ARCHITECTURE.md`); decisions in `docs/decisions/`.
+The owner is learning: every milestone report includes a short code walkthrough and likely interview questions.
 
 ## Non-negotiables
 - ₹0 budget: no paid APIs, paid cloud, paid DBs, local LLMs, or Ollama. Flag anything that needs a card.

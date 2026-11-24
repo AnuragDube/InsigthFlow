@@ -58,21 +58,35 @@ pointer files on disk. See §4.
   normalize country names and stock codes (upper-case, trimmed).
 - Flags: `is_cancellation` (invoice starts with `C`), `is_adjustment` (non-product stock codes such as
   postage/manual/bank charges — list maintained in the domain pack).
-- Deduplicate exact duplicate lines (same invoice, stock code, quantity, price, timestamp, customer) keeping
-  the earliest `_ingest_id`/`_row_number` → deterministic.
+- Combine batches with the **multiplicity rule** in §3a (overlapping batches don't double count; repeated
+  lines inside one batch are kept). Surviving rows keep the lineage of the earliest batch/row → deterministic.
 - Rows failing hard parsing (unparseable date, non-numeric quantity) go to **quarantine** with `reason_code`,
   not silently dropped.
 - Missing `customer_id` is kept (valid sales) but flagged; customer-level metrics exclude them explicitly.
 
-### 3a. Upload semantics (proposed — pending product-owner approval)
+### 3a. Upload semantics (recommended — pending product-owner confirmation; ADR-0017)
 - An upload **adds a batch** (an ingestion) to the data source; Silver is rebuilt from all *active* batches.
 - A batch can be **deactivated** (excluded from future runs; Bronze bytes are kept for audit) — this is how a
   bad upload is undone. Re-uploading identical bytes returns the existing batch.
-- Exact duplicate lines are de-duplicated **across batches** (so overlapping exports are safe), and the count
-  removed is reported. *Within* a single batch, exact duplicates are kept as a warning metric, because the
-  data cannot distinguish a genuine repeated purchase line from a duplicate — this needs your decision.
-- An upload while a run is active is stored, and a follow-up run is queued automatically when the active
-  run finishes (API returns 202 with both ids). No upload is ever stored-but-never-processed.
+- **Multiplicity rule for combining batches.** A line's identity is the tuple of all its business columns
+  (invoice, stock code, description, quantity, unit price, timestamp, customer, country). Each batch is
+  treated as a *multiset*: if an identical line appears `k` times in batch A and `m` times in batch B, Silver
+  keeps **`max(k, m)`** copies — not `k + m` (overlapping exports would double count) and not `1` (a
+  legitimate repeated line inside one export would be lost). Copies beyond the maximum are counted as
+  "cross-batch overlap removed" in the quality report.
+- Exact repeats **within** a batch are kept and reported as a warning metric: the source data cannot
+  distinguish a genuine repeated purchase line from an export duplicate. Changing this to "remove" later is
+  a one-line rule change plus a golden-test update.
+- **Upload during an active run:** the batch is stored and the data source gets a durable
+  `rerun_requested_at` marker (same transaction). When the active run finishes, the runner clears the marker
+  and starts a new run in one transaction; the startup recovery sweep also honours a leftover marker.
+  At most one run is ever queued/running per data source (`uq_one_active_run` unchanged), several uploads
+  during one run coalesce into one follow-up run, and no stored batch can be left unprocessed.
+
+### 3a-ii. Which dataset a request uses
+Metric, dashboard and NL-to-SQL endpoints take an explicit `dataset_id`. The UI shows a dataset selector that
+defaults to the most recently published dataset. If an org has no published dataset, analytics endpoints
+return a clear `409 no-published-data` problem, never an empty success.
 
 ### 3b. Time
 Source timestamps have no time zone (UK retailer). They are stored as naive timestamps and interpreted as
@@ -82,7 +96,7 @@ Source timestamps have no time zone (UK retailer). They are stored as naive time
 | Table | Grain | Notes |
 |---|---|---|
 | `dim_date` | day | calendar attributes |
-| `dim_customer` | customer | first/last order date, primary country (most frequent; tie → most recent), order count, lifetime revenue |
+| `dim_customer` | customer | first/last order date, primary country (most frequent; tie → most recent), order count, lifetime revenue. Includes one **unknown-customer member** (`customer_key = 'UNKNOWN'`) so that every fact row joins to a dimension even when the source has no customer id (standard Kimball practice) |
 | `dim_product` | stock code | latest description (deterministic tie-break), first seen |
 | `fact_sales` | invoice line (non-cancelled, non-adjustment, quantity > 0, price > 0) | `revenue = quantity * unit_price`; carries the line's `country` (country is a property of the order line in this data, not of the customer) |
 | `fact_returns` | cancelled lines | for return-rate metrics |
@@ -101,8 +115,13 @@ Source timestamps have no time zone (UK retailer). They are stored as naive time
   dimensions: [country, product]
   description: Sum of quantity × unit price over product lines that are not cancellations or adjustments, with quantity > 0 and price > 0.
 ```
-**Proposed P0 definitions — pending product-owner approval** (all within the selected date range, dates in
-the dataset's local time; see §3b):
+**Proposed P0 definitions — pending product-owner approval.** Rules common to all metrics:
+- Date range: `from` and `to` are **inclusive calendar dates** in dataset local time (§3b), implemented as
+  `invoice_date >= :from AND invoice_date < :to + 1 day`.
+- Every ratio uses `NULLIF(denominator, 0)` → a period with no orders returns `null` ("no data"), never 0 or an error.
+- Customer-level metrics exclude the unknown-customer member and state this in their description.
+- Sign conventions are **verified against the real file in Phase 3** before these are finalized (expected:
+  cancellation lines carry negative quantity, hence `ABS` below).
 | Metric | Definition |
 |---|---|
 | `gross_revenue` | `SUM(quantity × unit_price)` over `fact_sales` |
@@ -114,7 +133,7 @@ the dataset's local time; see §3b):
 | `active_customers` | distinct known `customer_id` with ≥ 1 order in the range |
 | `new_customers` | active customers whose first-ever order falls in the range |
 | `repeat_customer_rate` | of active customers, share with ≥ 2 orders **in the range** |
-| `return_rate` | `returns_value / gross_revenue` |
+| `return_rate_value` | `returns_value / gross_revenue` — a **value-based** rate. A count-based rate (`returned lines / sold lines`) is a different metric and is not in P0 |
 | breakdowns | gross revenue by country, top products by gross revenue |
 
 Customer-level metrics exclude lines with no `customer_id` and say so in their description.
@@ -136,7 +155,7 @@ decide whether the run may be published.
 | Cross-batch duplicates removed (count) | Silver | run | warning (reported) |
 | Within-batch exact duplicates (count) | Silver | run | warning (reported) |
 | `customer_id` null ratio ≤ 30% (UCI is known to have many missing ids) | Silver | run | warning |
-| No null keys in facts/dimensions; every fact joins to its dimensions | Gold | run | blocking |
+| No null keys in facts/dimensions; every fact joins to its dimensions (missing customers join to the unknown member) | Gold | run | blocking |
 | Gold gross revenue = Silver eligible revenue (± 0.01) | Gold | run | blocking |
 
 Thresholds are configuration, reviewed when real data is profiled in Phase 3 (not guessed as final now).
@@ -256,11 +275,12 @@ CREATE TABLE data_sources (                           -- a logical dataset, e.g.
   kind             text NOT NULL CHECK (kind IN ('file_upload','sample','connector')),
   contract_version text NOT NULL,
   published_run_id uuid,                             -- the one published run; set in the publish transaction
+  rerun_requested_at timestamptz,                     -- durable "new batches arrived during a run" marker (§3a)
   created_by       uuid REFERENCES users(id),
   created_at       timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (org_id, id),
   UNIQUE (org_id, name)
-  -- FK (org_id, published_run_id) → pipeline_runs added after that table exists (ALTER TABLE below)
+  -- FK (org_id, id, published_run_id) → pipeline_runs added after that table exists (ALTER TABLE below)
 );
 
 CREATE TABLE ingestions (
@@ -278,7 +298,8 @@ CREATE TABLE ingestions (
   created_by      uuid REFERENCES users(id),
   created_at      timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (org_id, id),
-  FOREIGN KEY (org_id, data_source_id) REFERENCES data_sources(org_id, id) ON DELETE CASCADE
+  FOREIGN KEY (org_id, data_source_id) REFERENCES data_sources(org_id, id) ON DELETE CASCADE,
+  UNIQUE (org_id, data_source_id, id)                 -- target for dataset-bound FKs
 );
 -- idempotent re-upload; rejected uploads don't block re-trying the same bytes after a contract fix
 CREATE UNIQUE INDEX uq_ingestion_bytes ON ingestions(org_id, data_source_id, sha256) WHERE status = 'stored';
@@ -299,21 +320,26 @@ CREATE TABLE pipeline_runs (
   created_at      timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (org_id, id),
   FOREIGN KEY (org_id, data_source_id) REFERENCES data_sources(org_id, id) ON DELETE CASCADE,
-  CHECK (finished_at IS NULL OR started_at IS NULL OR finished_at >= started_at)
+  CHECK (finished_at IS NULL OR started_at IS NULL OR finished_at >= started_at),
+  UNIQUE (org_id, data_source_id, id)                 -- target for dataset-bound FKs
 );
 CREATE INDEX ix_runs_source_created ON pipeline_runs(org_id, data_source_id, created_at DESC);
 CREATE UNIQUE INDEX uq_one_active_run ON pipeline_runs(org_id, data_source_id)
   WHERE status IN ('queued','running');              -- single-writer guarantee
 
-ALTER TABLE data_sources ADD FOREIGN KEY (org_id, published_run_id) REFERENCES pipeline_runs(org_id, id);
+-- The published run must belong to the same org AND the same data source:
+ALTER TABLE data_sources ADD FOREIGN KEY (org_id, id, published_run_id)
+  REFERENCES pipeline_runs(org_id, data_source_id, id);
 
 CREATE TABLE pipeline_run_inputs (                    -- which Bronze batches a run consumed (lineage)
-  org_id        uuid NOT NULL,
-  run_id        uuid NOT NULL,
-  ingestion_id  uuid NOT NULL,
+  org_id         uuid NOT NULL,
+  data_source_id uuid NOT NULL,
+  run_id         uuid NOT NULL,
+  ingestion_id   uuid NOT NULL,
   PRIMARY KEY (org_id, run_id, ingestion_id),
-  FOREIGN KEY (org_id, run_id) REFERENCES pipeline_runs(org_id, id) ON DELETE CASCADE,
-  FOREIGN KEY (org_id, ingestion_id) REFERENCES ingestions(org_id, id) ON DELETE CASCADE
+  -- run and batch must belong to the same org AND the same data source:
+  FOREIGN KEY (org_id, data_source_id, run_id) REFERENCES pipeline_runs(org_id, data_source_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (org_id, data_source_id, ingestion_id) REFERENCES ingestions(org_id, data_source_id, id) ON DELETE CASCADE
 );
 
 CREATE TABLE pipeline_stage_runs (

@@ -14,7 +14,10 @@ screen capture as a fallback and an offline demo mode for the AI features. A **p
 and **read-only and stateless**: bundled sample data is processed at build/start time, uploads are
 disabled, so ephemeral disks and sleeping instances do not lose anything. Persistent, multi-user hosting
 waits for P1 (auth) and uses a free Postgres (Neon) for metadata. **No free tier below is suitable for paying
-customers**; commercial launch requires paid infrastructure (§6).
+customers**; commercial launch requires paid infrastructure (§6). A public demo never exposes an
+unrestricted quota-consuming AI endpoint: either the labelled offline (fake) provider, or live AI behind a
+small global daily budget. Only public/synthetic data is used in any public demo. No hosting decision is
+final; terms are re-verified before any deployment, and deployment requires owner approval.
 
 ## 3. Environments
 

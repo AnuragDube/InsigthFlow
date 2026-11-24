@@ -1,0 +1,10 @@
+EXPECT OK: publish S1 run on S1
+EXPECT FK ERROR: publish S1 run on S2
+ERROR:  insert or update on table "data_sources" violates foreign key constraint "data_sources_org_id_id_published_run_id_fkey"
+DETAIL:  Key (org_id, id, published_run_id)=(00000000-0000-0000-0000-00000000000a, 00000000-0000-0000-0000-000000000052, 00000000-0000-0000-0000-0000000000f1) is not present in table "pipeline_runs".
+EXPECT FK ERROR: S1 run consuming an S2 batch
+ERROR:  insert or update on table "pipeline_run_inputs" violates foreign key constraint "pipeline_run_inputs_org_id_data_source_id_ingestion_id_fkey"
+DETAIL:  Key (org_id, data_source_id, ingestion_id)=(00000000-0000-0000-0000-00000000000a, 00000000-0000-0000-0000-000000000051, 00000000-0000-0000-0000-0000000000e2) is not present in table "ingestions".
+EXPECT FK ERROR: same, but lying about the data source
+ERROR:  insert or update on table "pipeline_run_inputs" violates foreign key constraint "pipeline_run_inputs_org_id_data_source_id_run_id_fkey"
+DETAIL:  Key (org_id, data_source_id, run_id)=(00000000-0000-0000-0000-00000000000a, 00000000-0000-0000-0000-000000000052, 00000000-0000-0000-0000-0000000000f1) is not present in table "pipeline_runs".

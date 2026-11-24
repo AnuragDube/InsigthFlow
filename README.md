@@ -11,6 +11,7 @@ cited answers. First domain: e-commerce analytics.
 ## Documentation
 | Doc | Contents |
 |---|---|
+| [Status](docs/STATUS.md) | Current phase, pending decisions, blockers — start here |
 | [PRD](docs/PRD.md) | Vision, users, journeys, P0/P1/P2 scope, requirements |
 | [Architecture](docs/ARCHITECTURE.md) | Modules, technology selection, API design, AI architecture |
 | [Data architecture](docs/DATA_ARCHITECTURE.md) | Medallion design, storage layout, metrics, quality, metadata schema |
