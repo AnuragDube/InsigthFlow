@@ -372,6 +372,12 @@ CREATE TABLE ml_models (                              -- P1
 CREATE UNIQUE INDEX uq_one_active_model ON ml_models(org_id, kind) WHERE status = 'active';
 ```
 
+**Validation performed (2026-11-24):** this DDL (plus `CREATE EXTENSION citext`) was applied to a local
+PostgreSQL 16 instance: 17 tables created without errors. Constraint checks run by hand: a membership pointing
+at another org's role, and a pipeline run pointing at another org's data source, were both rejected by the
+composite FKs; a second `queued/running` run for the same data source was rejected by `uq_one_active_run`.
+These checks become automated migration tests in the metadata phase.
+
 ### Organization isolation strategy (layered)
 1. **Request context:** org comes from the principal (P1) / demo config (P0), never from client input.
 2. **Repository layer:** every repository method takes `OrgContext` as a required first argument and adds
