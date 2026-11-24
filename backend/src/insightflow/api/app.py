@@ -10,6 +10,7 @@ from insightflow.api import middleware
 from insightflow.api.routers import health
 from insightflow.core.logging import configure_logging
 from insightflow.core.settings import Settings, get_settings
+from insightflow.metadata.db import make_engine
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -23,6 +24,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url=None,
     )
     app.state.settings = settings
+    app.state.engine = make_engine(settings.database_url)
     middleware.install(app)
     app.add_middleware(
         CORSMiddleware,

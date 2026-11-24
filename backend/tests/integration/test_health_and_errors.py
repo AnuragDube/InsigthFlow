@@ -76,3 +76,9 @@ def test_mutation_requires_client_header(
 def test_untrusted_host_rejected(settings: Settings) -> None:
     r = _client(settings).get("/health", headers={"Host": "evil.com"})
     assert r.status_code == 400
+
+
+def test_ready_checks_database_and_data_dir(settings: Settings) -> None:
+    r = _client(settings).get("/ready")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ready", "checks": {"database": "ok", "data_dir": "ok"}}
