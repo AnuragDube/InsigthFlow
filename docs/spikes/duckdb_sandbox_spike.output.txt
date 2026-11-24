@@ -1,0 +1,12 @@
+duckdb 2.0.1 sqlglot 30.34.0
+ALLOWED  select sum(amt) from orders
+BLOCKED  select * from v_parquet -> PermissionException
+BLOCKED  select * from read_csv('/tmp/tmprmjy4wgy/secret.csv') -> PermissionException
+BLOCKED  insert into orders values (2, 3) -> InvalidInputException
+BLOCKED  set enable_external_access=true -> InvalidInputException
+BLOCKED  attach ':memory:' as x -> CatalogException
+BLOCKED  install httpfs -> PermissionException
+BLOCKED  copy orders to '/tmp/tmprmjy4wgy/out.csv' -> PermissionException
+BLOCKED  second connection with different config -> ConnectionException
+statements in 'select 1; drop table x': 2
+table names: ['orders', ''] functions: ['ReadParquet']
