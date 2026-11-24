@@ -44,6 +44,16 @@ it("tells the reader the headline in a sentence and lists every KPI", async () =
   expect(screen.getByText("+21.7%")).toHaveClass("down");
   expect(await screen.findByText(/1,067,371/)).toBeInTheDocument();
   expect(screen.getByText("REGENCY CAKESTAND 3 TIER")).toBeInTheDocument();
+  // The last month is cut short by the data, so its dip must be explained.
+  expect(screen.getByText(/Dec 2011 only has data up to 9 Dec/)).toBeInTheDocument();
+});
+
+it("says once that there is nothing earlier to compare with", async () => {
+  const none = { ...dashboard, kpis: dashboard.kpis.map((k) => ({ ...k, previous: null, change: null })) };
+  mockFetch((url) => (url.includes("/dashboard") ? { body: none } : url.includes("/pipeline-runs/") ? { status: 404, body: {} } : undefined));
+  renderWithQuery(<Overview datasetId="d1" onOpenData={() => {}} />);
+  expect(await screen.findByText("Nothing earlier to compare with.")).toBeInTheDocument();
+  expect(screen.queryByText(/vs previous/)).not.toBeInTheDocument();
 });
 
 it("invites the user to load data when nothing is published yet", async () => {

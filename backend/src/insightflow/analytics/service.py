@@ -103,7 +103,12 @@ def dashboard(
         rng = _resolve(con, start, end)
         current = compute_kpis(con, metrics, rng.start, rng.end)
         prev_start, prev_end = rng.previous()
-        previous = compute_kpis(con, metrics, prev_start, prev_end)
+        # A period entirely before the data has no values (not "0 orders"): no comparison.
+        previous = (
+            compute_kpis(con, metrics, prev_start, prev_end)
+            if prev_end >= rng.min
+            else dict.fromkeys(metrics)
+        )
         grain: Grain = "day" if rng.days <= DAILY_TREND_MAX_DAYS else "month"
         gross = metrics["gross_revenue"]
         trend = compute_series(con, gross, rng.start, rng.end, grain)

@@ -16,7 +16,7 @@ function roundTo(value: number, digits: number): number {
 function money(v: number): string {
   const sign = v < 0 ? "-" : "";
   const a = Math.abs(v);
-  if (a >= 1_000_000) return `${sign}£${roundTo(a / 1_000_000, 1)}M`;
+  if (a >= 1_000_000) return `${sign}£${roundTo(a / 1_000_000, 1).toFixed(1)}M`;
   if (a >= 10_000) return `${sign}£${grouped.format(roundTo(a / 1_000, 0))}K`;
   return `${sign}£${pence.format(roundTo(a, 2))}`;
 }

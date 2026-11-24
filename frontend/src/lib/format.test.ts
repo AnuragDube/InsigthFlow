@@ -4,6 +4,7 @@ describe("formatValue", () => {
   it("abbreviates large money amounts", () => {
     expect(formatValue(19701685.49, "GBP")).toBe("£19.7M");
     expect(formatValue(719656.34, "GBP")).toBe("£720K");
+    expect(formatValue(18982029.15, "GBP")).toBe("£19.0M");
   });
   it("keeps pence for small amounts", () => {
     expect(formatValue(140.445, "GBP")).toBe("£140.45");

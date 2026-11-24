@@ -11,7 +11,7 @@ function deltaClass(kpi: Kpi): string {
   return `delta ${good ? "up" : "down"}`;
 }
 
-function KpiItem({ kpi, comparison }: { kpi: Kpi; comparison: string }) {
+function KpiItem({ kpi, comparison }: { kpi: Kpi; comparison: string | null }) {
   const [open, setOpen] = useState(false);
   const defId = useId();
   return (
@@ -33,10 +33,12 @@ function KpiItem({ kpi, comparison }: { kpi: Kpi; comparison: string }) {
         <div className="value" title={formatExact(kpi.value, kpi.unit)}>
           {formatValue(kpi.value, kpi.unit)}
         </div>
-        <div>
-          <span className={deltaClass(kpi)}>{formatChange(kpi.change)}</span>
-          <span className="delta"> {comparison}</span>
-        </div>
+        {comparison && (
+          <div>
+            <span className={deltaClass(kpi)}>{formatChange(kpi.change)}</span>
+            <span className="delta"> {comparison}</span>
+          </div>
+        )}
         {open && (
           <p className="definition" id={defId}>
             {kpi.description}
@@ -47,12 +49,16 @@ function KpiItem({ kpi, comparison }: { kpi: Kpi; comparison: string }) {
   );
 }
 
-export function KpiLedger({ kpis, comparison }: { kpis: Kpi[]; comparison: string }) {
+/** `comparison` is null when no metric has an earlier period: then say so once, not per tile. */
+export function KpiLedger({ kpis, comparison }: { kpis: Kpi[]; comparison: string | null }) {
   return (
-    <dl className="ledger" aria-label="Key metrics">
-      {kpis.map((k) => (
-        <KpiItem key={k.name} kpi={k} comparison={comparison} />
-      ))}
-    </dl>
+    <>
+      {comparison === null && <p className="hint">Nothing earlier to compare with.</p>}
+      <dl className="ledger" aria-label="Key metrics">
+        {kpis.map((k) => (
+          <KpiItem key={k.name} kpi={k} comparison={comparison} />
+        ))}
+      </dl>
+    </>
   );
 }

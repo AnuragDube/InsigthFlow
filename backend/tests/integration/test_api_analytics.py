@@ -44,6 +44,8 @@ def test_dashboard_defaults_to_full_range(client: TestClient, ds: uuid.UUID) -> 
     g = kpi(body, "gross_revenue")
     assert g["value"] == pytest.approx(140.445) and g["unit"] == "GBP"
     assert g["previous"] is None and g["change"] is None  # nothing before the data starts
+    # Counts too: "0 orders before the data starts" would be a false comparison.
+    assert all(k["previous"] is None for k in body["kpis"])
     assert kpi(body, "repeat_customer_rate")["value"] == pytest.approx(0.25)
     assert body["trend"]["grain"] == "day" and len(body["trend"]["points"]) == 6
     assert body["top_products"][0] == {"key": "22633", "label": "HAND WARMER", "value": 37.0}

@@ -69,6 +69,7 @@ def test_reupload_returns_existing_without_new_run(client: TestClient) -> None:
     assert again.json()["run_id"] is None
     runs = client.get("/api/v1/pipeline-runs", params={"dataset_id": ds}).json()["items"]
     assert len(runs) == 1
+    assert runs[0]["stages"][0]["stage"] == "silver"  # the list includes stage stats
 
 
 def test_bad_batch_blocks_then_deactivating_it_republishes(client: TestClient) -> None:

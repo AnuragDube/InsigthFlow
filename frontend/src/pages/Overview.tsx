@@ -6,7 +6,7 @@ import { KpiLedger } from "../components/KpiLedger";
 import { Provenance } from "../components/Provenance";
 import { RankedList } from "../components/RankedList";
 import { TrendChart } from "../components/TrendChart";
-import { formatDateRange, formatValue } from "../lib/format";
+import { formatDate, formatDateRange, formatValue } from "../lib/format";
 
 type Preset = "all" | "12m" | "3m" | "30d";
 const PRESETS: { id: Preset; label: string }[] = [
@@ -28,6 +28,19 @@ function presetRange(preset: Preset, max: string): { from?: string; to?: string 
   if (preset === "all") return {};
   if (preset === "30d") return { from: shift(max, 29), to: max };
   return { from: shift(max, -1, preset === "12m" ? 12 : 3), to: max };
+}
+
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Monthly charts: say when the first/last month is cut short, so a dip isn't misread. */
+export function partialMonthNote(from: string, to: string): string | null {
+  const notes: string[] = [];
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const [ty, tm, td] = to.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(ty ?? 0, tm ?? 1, 0)).getUTCDate();
+  if (fd !== 1) notes.push(`${MONTH_NAMES[(fm ?? 1) - 1]} ${fy} only has data from ${formatDate(from).replace(/ \d{4}$/, "")}`);
+  if (td !== lastDay) notes.push(`${MONTH_NAMES[(tm ?? 1) - 1]} ${ty} only has data up to ${formatDate(to).replace(/ \d{4}$/, "")}`);
+  return notes.length ? `${notes.join("; ")}.` : null;
 }
 
 function kpi(d: Dashboard, name: string) {
@@ -108,11 +121,18 @@ export function Overview({ datasetId, onOpenData }: { datasetId: string; onOpenD
 
       <Provenance freshness={d.freshness} onOpenData={onOpenData} />
 
-      <KpiLedger kpis={d.kpis} comparison={`vs previous ${days} days`} />
+      <KpiLedger
+        kpis={d.kpis}
+        comparison={d.kpis.some((k) => k.previous !== null) ? `vs previous ${days} days` : null}
+      />
 
       <section className="section">
         <h2>Gross revenue by {d.trend.grain}</h2>
-        <p className="hint">Days without sales count as zero.</p>
+        <p className="hint">
+          {d.trend.grain === "month"
+            ? (partialMonthNote(d.range.from, d.range.to) ?? "Each point is a calendar month.")
+            : "Days without sales count as zero."}
+        </p>
         <TrendChart trend={d.trend} />
       </section>
 
