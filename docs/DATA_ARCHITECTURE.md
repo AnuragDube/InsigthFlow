@@ -54,10 +54,12 @@ pointer files on disk. See §4.
 
 ### Silver — cleaned, validated, standardized (e-commerce pack)
 `silver.order_lines` from all **active** Bronze ingestions of the data source (upload semantics: see §3a):
-- Cast types (`quantity INTEGER`, `unit_price DECIMAL(12,2)`, `invoice_ts TIMESTAMP`), trim strings,
+- Cast types (`quantity INTEGER`, `unit_price DECIMAL(12,3)` — the data has 3-decimal prices; more
+  decimals are quarantined rather than rounded — `invoice_ts TIMESTAMP`), trim strings,
   normalize country names and stock codes (upper-case, trimmed).
-- Flags: `is_cancellation` (invoice starts with `C`), `is_adjustment` (non-product stock codes such as
-  postage/manual/bank charges — list maintained in the domain pack).
+- Flags: `is_cancellation` (invoice starts with `C`), `is_bad_debt` (starts with `A`), `is_writeoff`
+  (negative quantity on a non-`C` invoice), `is_adjustment` (non-product stock codes such as
+  postage/manual/bank charges/vouchers — list in `domains/ecommerce/rules.yaml`). Evidence: DATA_PROFILE.md.
 - Combine batches with the **multiplicity rule** in §3a (overlapping batches don't double count; repeated
   lines inside one batch are kept). Surviving rows keep the lineage of the earliest batch/row → deterministic.
 - Rows failing hard parsing (unparseable date, non-numeric quantity) go to **quarantine** with `reason_code`,

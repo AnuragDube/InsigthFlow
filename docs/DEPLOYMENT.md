@@ -80,8 +80,9 @@ final; terms are re-verified before any deployment, and deployment requires owne
    never demo live from a sleeping free host — use local.
 2. **Ephemeral disks**: public demo is stateless by construction; private beta needs B2 (or Neon for small
    docs) for anything that must persist.
-3. **Memory**: Koyeb 512 MB may not fit FastAPI + DuckDB + bm25s comfortably; measure in Phase 7 before
-   choosing the host. DuckDB `memory_limit` is set explicitly.
+3. **Memory**: measured peak ≈ 1.0 GB RSS for a full UCI pipeline run (DATA_PROFILE.md), 153 MB idle.
+   A 512 MB instance (Koyeb) does not fit as-is; a read-only demo that only *serves* prebuilt Gold
+   may — to be measured. DuckDB `memory_limit` is configurable.
 4. **Quotas pause rather than bill** on Netlify/Vercel/Neon — good for ₹0, bad for availability.
 5. **Non-commercial terms**: Databricks Free Edition, Vercel Hobby, GitHub Pages — never on the commercial path.
 6. **Card-required services** are excluded: Fly.io; R2 and Render are flagged until verified.
