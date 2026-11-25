@@ -2,12 +2,29 @@
 
 from __future__ import annotations
 
-from fastapi import Request
+import uuid
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Annotated, Literal
+
+from fastapi import Depends, Request
 from sqlalchemy.engine import Engine
 
 from insightflow.analytics.question_provider import QuestionProvider
 from insightflow.core.context import OrgContext
+from insightflow.core.errors import AuthenticationRequired, ForbiddenError
 from insightflow.core.settings import Settings
+from insightflow.metadata.db import session_scope
+from insightflow.metadata.models import Organization
+
+
+@dataclass(frozen=True)
+class Principal:
+    org_id: uuid.UUID
+    role: Literal["owner", "editor", "viewer"]
+
+
+PrincipalResolver = Callable[[Request], Principal | None]
 
 
 def get_settings_dep(request: Request) -> Settings:
@@ -25,10 +42,31 @@ def get_question_provider(request: Request) -> QuestionProvider | None:
     return provider
 
 
-def get_org_context(request: Request) -> OrgContext:
-    """P0: every request acts for the local demo org (no authentication yet; see SECURITY.md).
+def get_principal(request: Request, engine: Annotated[Engine, Depends(get_engine)]) -> Principal:
+    resolver: PrincipalResolver | None = request.app.state.principal_resolver
+    if resolver is None:
+        ctx: OrgContext = request.app.state.demo_ctx
+        return Principal(ctx.org_id, "owner")
+    principal = resolver(request)
+    if principal is None:
+        raise AuthenticationRequired("Sign in to access this workspace.")
+    with session_scope(engine) as session:
+        organization = session.get(Organization, principal.org_id)
+        if organization is None or organization.status != "active":
+            raise ForbiddenError("This workspace is unavailable.")
+    if principal.role not in {"owner", "editor", "viewer"}:
+        raise ForbiddenError("You do not have access to this workspace.")
+    return principal
 
-    The org is never taken from request input. P1 replaces this with the authenticated principal.
-    """
-    ctx: OrgContext = request.app.state.demo_ctx
-    return ctx
+
+Authenticated = Annotated[Principal, Depends(get_principal)]
+
+
+def get_org_context(principal: Authenticated) -> OrgContext:
+    return OrgContext(principal.org_id)
+
+
+def get_editor_context(principal: Authenticated) -> OrgContext:
+    if principal.role not in {"owner", "editor"}:
+        raise ForbiddenError("This action requires an editor or owner role.")
+    return OrgContext(principal.org_id)

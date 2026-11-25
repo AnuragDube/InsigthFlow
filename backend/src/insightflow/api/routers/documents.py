@@ -7,12 +7,13 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.engine import Engine
 
-from insightflow.api.deps import get_engine, get_org_context
+from insightflow.api.deps import get_editor_context, get_engine, get_org_context
 from insightflow.core.context import OrgContext
 from insightflow.documents import service
 
 router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
 Ctx = Annotated[OrgContext, Depends(get_org_context)]
+EditorCtx = Annotated[OrgContext, Depends(get_editor_context)]
 Eng = Annotated[Engine, Depends(get_engine)]
 
 
@@ -33,14 +34,16 @@ def list_documents(ctx: Ctx, engine: Eng) -> list[DocumentOut]:
 
 
 @router.post("", status_code=201)
-def upload_document(ctx: Ctx, engine: Eng, file: Annotated[UploadFile, File()]) -> DocumentOut:
+def upload_document(
+    ctx: EditorCtx, engine: Eng, file: Annotated[UploadFile, File()]
+) -> DocumentOut:
     return DocumentOut.model_validate(
         service.add_document(ctx, engine, file.filename or "", file.file)
     )
 
 
 @router.delete("/{document_id}", status_code=204)
-def delete_document(document_id: uuid.UUID, ctx: Ctx, engine: Eng) -> None:
+def delete_document(document_id: uuid.UUID, ctx: EditorCtx, engine: Eng) -> None:
     service.delete_document(ctx, engine, document_id)
 
 

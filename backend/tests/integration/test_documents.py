@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from insightflow.api.app import create_app
-from insightflow.api.deps import get_org_context
+from insightflow.api.deps import Principal, get_principal
 from insightflow.core.settings import Settings
 from insightflow.metadata.bootstrap import ensure_org
 from insightflow.metadata.db import session_scope
@@ -80,7 +80,7 @@ def test_corpus_is_scoped_before_search_and_delete(settings: Settings) -> None:
             DOCS, files={"file": ("private.txt", b"Refunds take seven days.")}, headers=H
         )
         doc = result.json()
-        app.dependency_overrides[get_org_context] = lambda: other_org
+        app.dependency_overrides[get_principal] = lambda: Principal(other_org.org_id, "editor")
         assert client.get(DOCS).json() == []
         assert client.post(f"{DOCS}/search", json={"question": "refunds"}, headers=H).json() == []
         assert client.delete(f"{DOCS}/{doc['id']}", headers=H).status_code == 404
