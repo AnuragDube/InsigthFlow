@@ -24,6 +24,10 @@ def _digest(token: str) -> str:
     return hashlib.sha256(token.encode("ascii")).hexdigest()
 
 
+def session_digest(token: str | None) -> str | None:
+    return _digest(token) if token is not None and _TOKEN_PATTERN.fullmatch(token) else None
+
+
 def resolve_session(session: Session, token: str) -> VerifiedIdentity | None:
     if not _TOKEN_PATTERN.fullmatch(token):
         return None
@@ -39,16 +43,25 @@ def resolve_session(session: Session, token: str) -> VerifiedIdentity | None:
 
 
 def revoke_session(session: Session, token: str | None) -> None:
-    if token is not None and _TOKEN_PATTERN.fullmatch(token):
-        session.execute(delete(BrowserSession).where(BrowserSession.token_hash == _digest(token)))
+    digest = session_digest(token)
+    if digest is not None:
+        session.execute(delete(BrowserSession).where(BrowserSession.token_hash == digest))
 
 
-def issue_session(session: Session, identity: VerifiedIdentity, previous: str | None) -> str:
+def issue_session(
+    session: Session,
+    identity: VerifiedIdentity,
+    previous: str | None,
+    *,
+    prior_digest: str | None = None,
+) -> str:
     if role_for(session, identity) is None:
         raise ForbiddenError("You do not have access to this workspace.")
     now = datetime.now(UTC)
     session.execute(delete(BrowserSession).where(BrowserSession.expires_at <= now))
     revoke_session(session, previous)
+    if prior_digest is not None:
+        session.execute(delete(BrowserSession).where(BrowserSession.token_hash == prior_digest))
     token = secrets.token_urlsafe(32)
     session.add(
         BrowserSession(

@@ -48,10 +48,18 @@ class AccessTokenResolver:
         if len(authorization) != 1 or len(workspace) != 1:
             return None
         scheme, _, token = authorization[0].partition(" ")
-        if scheme.casefold() != "bearer" or not 1 <= len(token) <= _MAX_TOKEN_LENGTH:
+        if scheme.casefold() != "bearer":
             return None
         try:
             org_id = UUID(workspace[0])
+        except ValueError:
+            return None
+        return self.verify(token, org_id)
+
+    def verify(self, token: str, org_id: UUID) -> VerifiedIdentity | None:
+        if not 1 <= len(token) <= _MAX_TOKEN_LENGTH:
+            return None
+        try:
             verified = jwt.decode_complete(
                 token,
                 key=self._key,

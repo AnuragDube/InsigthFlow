@@ -21,9 +21,10 @@ server-side identity resolver. The application looks up the role from a stored m
 keyed by workspace, verified issuer, and verified subject. Viewers may read, ask questions,
 and search documents. Editors and owners may mutate datasets and documents. A local operator
 can create a workspace, grant or change a role, and revoke membership. The default app remains
-a localhost demo. The app supports opt-in browser sessions, with an adapter for signed
-RFC 9068 access tokens. The adapter was exercised using local signing keys. Selecting and
-connecting a live pilot provider, then verifying interactive sign-in, remain open.
+a localhost demo. The app supports opt-in browser sessions, signed RFC 9068 access tokens,
+and a workspace sign-in screen using OAuth authorization code with PKCE. Integration tests
+exercise the callback with a simulated provider and locally signed tokens. Selecting and
+connecting a live provider, then verifying sign-in against that provider, remain open.
 
 M5 Linux verification passed **152 backend tests in 25.34 s**, along with Ruff lint,
 formatting, and mypy. The authorization test covers all seven mutation routes and
@@ -44,6 +45,7 @@ cross-organization access to published analysis and documents.
 | M5 workspace memberships | `feat/m5-workspace-memberships`, based on merged authorization at `1951dba` |
 | M5 browser sessions | `feat/m5-browser-sessions`, based on merged memberships at `4dc67c2` |
 | M5 token verification | `feat/m5-token-verification`, based on merged browser sessions at `0d3052c` |
+| M5 interactive sign-in | `feat/m5-interactive-sign-in`, based on merged token verification at `cba7bdf` |
 
 Remote branch discovery returned those two branches and no `main` branch. The selected starting
 checkout was local `work` at the M1 tip. Phase 1 was approved on 24 November. The architecture,

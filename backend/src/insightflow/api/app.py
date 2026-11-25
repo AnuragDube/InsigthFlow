@@ -13,6 +13,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from insightflow.analytics.question_provider import QuestionProvider
 from insightflow.api import middleware
+from insightflow.api.authorization_code import AuthorizationCodeFlow
 from insightflow.api.background import run_in_background
 from insightflow.api.body_limit import BodySizeLimitMiddleware
 from insightflow.api.deps import IdentityResolver
@@ -53,8 +54,11 @@ def create_app(
     question_provider: QuestionProvider | None = None,
     identity_resolver: IdentityResolver | None = None,
     session_login_resolver: IdentityResolver | None = None,
+    authorization_code_flow: AuthorizationCodeFlow | None = None,
 ) -> FastAPI:
-    if identity_resolver is not None and session_login_resolver is not None:
+    if identity_resolver is not None and (
+        session_login_resolver is not None or authorization_code_flow is not None
+    ):
         raise ValueError("Choose either direct identity resolution or browser sessions.")
     settings = settings or get_settings()
     if settings.environment != "test":
@@ -70,6 +74,7 @@ def create_app(
     app.state.question_provider = question_provider
     app.state.identity_resolver = identity_resolver
     app.state.session_login_resolver = session_login_resolver
+    app.state.authorization_code_flow = authorization_code_flow
     app.state.engine = make_engine(settings.database_url)
     middleware.install(app)
     app.add_middleware(
