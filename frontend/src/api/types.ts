@@ -122,3 +122,18 @@ export interface DocumentCitation {
   end_line: number;
   excerpt: string;
 }
+
+export interface SalesForecast {
+  metric: string;
+  unit: Unit;
+  published_run_id: string;
+  history_from: string;
+  as_of: string;
+  points: { date: string; seasonal_naive: number; weekday_average: number }[];
+  backtest: {
+    folds: number;
+    days_evaluated: number;
+    seasonal_naive_mae: number;
+    weekday_average_mae: number;
+  };
+}

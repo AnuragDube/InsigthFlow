@@ -107,3 +107,8 @@ def metric_breakdown(
     limit: Annotated[int, Query(ge=1, le=50)] = 10,
 ) -> dict[str, Any]:
     return service.breakdown(ctx, engine, settings, dataset_id, name, dimension, start, end, limit)
+
+
+@router.get("/datasets/{dataset_id}/forecast")
+def sales_forecast(dataset_id: uuid.UUID, ctx: Ctx, engine: Eng, settings: Cfg) -> dict[str, Any]:
+    return service.sales_forecast(ctx, engine, settings, dataset_id)
