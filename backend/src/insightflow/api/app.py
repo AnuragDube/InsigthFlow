@@ -16,7 +16,7 @@ from insightflow.api import middleware
 from insightflow.api.background import run_in_background
 from insightflow.api.body_limit import BodySizeLimitMiddleware
 from insightflow.api.deps import IdentityResolver
-from insightflow.api.routers import analytics, datasets, documents, health, runs
+from insightflow.api.routers import analytics, datasets, documents, health, runs, sessions
 from insightflow.api.spa import SecurityHeadersMiddleware, mount_spa
 from insightflow.core.logging import configure_logging
 from insightflow.core.settings import Settings, get_settings
@@ -52,7 +52,10 @@ def create_app(
     *,
     question_provider: QuestionProvider | None = None,
     identity_resolver: IdentityResolver | None = None,
+    session_login_resolver: IdentityResolver | None = None,
 ) -> FastAPI:
+    if identity_resolver is not None and session_login_resolver is not None:
+        raise ValueError("Choose either direct identity resolution or browser sessions.")
     settings = settings or get_settings()
     if settings.environment != "test":
         configure_logging()
@@ -66,6 +69,7 @@ def create_app(
     app.state.settings = settings
     app.state.question_provider = question_provider
     app.state.identity_resolver = identity_resolver
+    app.state.session_login_resolver = session_login_resolver
     app.state.engine = make_engine(settings.database_url)
     middleware.install(app)
     app.add_middleware(
@@ -98,6 +102,7 @@ def create_app(
     app.include_router(runs.router)
     app.include_router(analytics.router)
     app.include_router(documents.router)
+    app.include_router(sessions.router)
     if settings.frontend_dist is not None:
         mount_spa(app, settings.frontend_dist)  # last: catch-all for client-side routes
     return app

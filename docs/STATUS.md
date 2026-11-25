@@ -21,7 +21,8 @@ server-side identity resolver. The application looks up the role from a stored m
 keyed by workspace, verified issuer, and verified subject. Viewers may read, ask questions,
 and search documents. Editors and owners may mutate datasets and documents. A local operator
 can create a workspace, grant or change a role, and revoke membership. The default app remains
-a localhost demo. The sign-in provider and session lifecycle remain open.
+a localhost demo. The app now supports opt-in browser sessions after a trusted identity exchange.
+Selecting and connecting the pilot sign-in provider, then verifying interactive sign-in, remain open.
 
 M5 Linux verification passed **152 backend tests in 25.34 s**, along with Ruff lint,
 formatting, and mypy. The authorization test covers all seven mutation routes and
@@ -40,6 +41,7 @@ cross-organization access to published analysis and documents.
 | M4 offline documents | `feat/m4-offline-documents`, based on the green M3 branch |
 | M5 pilot authorization | `feat/m5-pilot-authorization`, based on the merged M4 baseline |
 | M5 workspace memberships | `feat/m5-workspace-memberships`, based on merged authorization at `1951dba` |
+| M5 browser sessions | `feat/m5-browser-sessions`, based on merged memberships at `4dc67c2` |
 
 Remote branch discovery returned those two branches and no `main` branch. The selected starting
 checkout was local `work` at the M1 tip. Phase 1 was approved on 24 November. The architecture,
