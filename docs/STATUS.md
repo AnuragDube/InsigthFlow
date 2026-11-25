@@ -16,11 +16,12 @@ activation and broader natural-language interpretation remain open.
 returns matching excerpts with source line numbers, and supports removal. It runs locally with BM25
 and returns an empty result when lexical evidence is insufficient.
 
-**M5 private-pilot authorization has started.** The app factory can accept a trusted
-server-side principal resolver. A configured resolver must authenticate requests and return an
-active organization and role. Viewers may read, ask questions, and search documents. Editors
-and owners may mutate datasets and documents. The default app remains a localhost demo. The
-sign-in provider, membership administration, and session lifecycle remain open.
+**M5 private-pilot authorization is underway.** The app factory can accept a trusted
+server-side identity resolver. The application looks up the role from a stored membership
+keyed by workspace, verified issuer, and verified subject. Viewers may read, ask questions,
+and search documents. Editors and owners may mutate datasets and documents. A local operator
+can create a workspace, grant or change a role, and revoke membership. The default app remains
+a localhost demo. The sign-in provider and session lifecycle remain open.
 
 M5 Linux verification passed **152 backend tests in 25.34 s**, along with Ruff lint,
 formatting, and mypy. The authorization test covers all seven mutation routes and
@@ -38,6 +39,7 @@ cross-organization access to published analysis and documents.
 | M3 offline analytics | `feat/m3-offline-analytics`, based on the demo branch |
 | M4 offline documents | `feat/m4-offline-documents`, based on the green M3 branch |
 | M5 pilot authorization | `feat/m5-pilot-authorization`, based on the merged M4 baseline |
+| M5 workspace memberships | `feat/m5-workspace-memberships`, based on merged authorization at `1951dba` |
 
 Remote branch discovery returned those two branches and no `main` branch. The selected starting
 checkout was local `work` at the M1 tip. Phase 1 was approved on 24 November. The architecture,

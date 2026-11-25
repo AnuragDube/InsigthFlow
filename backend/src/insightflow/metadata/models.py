@@ -30,6 +30,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+from insightflow.core.context import Role
+
 
 def utcnow() -> datetime:
     return datetime.now(UTC)
@@ -262,3 +264,16 @@ class Document(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     title: Mapped[str] = mapped_column(String(200))
     content: Mapped[str] = mapped_column(Text)
+
+
+class WorkspaceMembership(Base):
+    __tablename__ = "workspace_memberships"
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True
+    )
+    issuer: Mapped[str] = mapped_column(String(255), primary_key=True)
+    subject: Mapped[str] = mapped_column(String(255), primary_key=True)
+    role: Mapped[Role] = mapped_column(String(16))
+    __table_args__ = (
+        CheckConstraint("role IN ('owner','editor','viewer')", name="ck_workspace_membership_role"),
+    )

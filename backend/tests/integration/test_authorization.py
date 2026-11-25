@@ -6,10 +6,11 @@ from fastapi import Request
 from fastapi.testclient import TestClient
 
 from insightflow.api.app import create_app
-from insightflow.api.deps import Principal
+from insightflow.core.context import VerifiedIdentity
 from insightflow.core.settings import Settings
 from insightflow.metadata.bootstrap import ensure_org
 from insightflow.metadata.db import session_scope
+from insightflow.metadata.memberships import set_role
 from insightflow.metadata.models import Organization
 from pipeline_helpers import FIX
 
@@ -19,12 +20,12 @@ DOCUMENTS = "/api/v1/documents"
 
 
 def test_principal_scopes_reads_and_requires_editor_for_writes(settings: Settings) -> None:
-    principals: dict[str, Principal] = {}
+    identities: dict[str, VerifiedIdentity] = {}
 
-    def resolve(request: Request) -> Principal | None:
-        return principals.get(request.headers.get("authorization", ""))
+    def resolve(request: Request) -> VerifiedIdentity | None:
+        return identities.get(request.headers.get("authorization", ""))
 
-    app = create_app(settings, principal_resolver=resolve)
+    app = create_app(settings, identity_resolver=resolve)
     with TestClient(app, raise_server_exceptions=False) as client:
         with session_scope(app.state.engine) as session:
             first = ensure_org(session, "first", "First organization").org_id
@@ -33,19 +34,26 @@ def test_principal_scopes_reads_and_requires_editor_for_writes(settings: Setting
             org = session.get(Organization, suspended)
             assert org is not None
             org.status = "suspended"
-        principals.update(
+        identities.update(
             {
-                "editor": Principal(first, "editor"),
-                "viewer": Principal(first, "viewer"),
-                "other": Principal(second, "editor"),
-                "suspended": Principal(suspended, "owner"),
-                "unknown": Principal(uuid.uuid4(), "owner"),
+                "editor": VerifiedIdentity("test-issuer", "editor", first),
+                "viewer": VerifiedIdentity("test-issuer", "viewer", first),
+                "other": VerifiedIdentity("test-issuer", "editor", second),
+                "suspended": VerifiedIdentity("test-issuer", "viewer", suspended),
+                "unknown": VerifiedIdentity("test-issuer", "editor", uuid.uuid4()),
+                "unassigned": VerifiedIdentity("test-issuer", "unassigned", first),
+                "different-issuer": VerifiedIdentity("different-issuer", "editor", first),
             }
         )
+        with session_scope(app.state.engine) as session:
+            set_role(session, identities["editor"], "editor")
+            set_role(session, identities["viewer"], "viewer")
+            set_role(session, identities["other"], "editor")
+            set_role(session, identities["suspended"], "owner")
         unauthenticated = client.get(DATASETS, headers={"X-Organization": str(first)})
         assert unauthenticated.status_code == 401
         assert unauthenticated.json()["type"] == "/errors/authentication-required"
-        for identity in ("unknown", "suspended"):
+        for identity in ("unknown", "suspended", "unassigned", "different-issuer"):
             assert client.get(DATASETS, headers={"Authorization": identity}).status_code == 403
 
         editor = {**H, "Authorization": "editor"}
@@ -107,3 +115,12 @@ def test_principal_scopes_reads_and_requires_editor_for_writes(settings: Setting
         assert client.post(f"{ds}/load-sample", headers=other).status_code == 404
         assert client.delete(doc_path, headers=other).status_code == 404
         assert client.delete(doc_path, headers=editor).status_code == 204
+
+        with session_scope(app.state.engine) as session:
+            set_role(session, identities["editor"], "viewer")
+        assert client.post(DATASETS, headers=editor, json={"name": "Denied"}).status_code == 403
+        assert client.get(DATASETS, headers=editor).status_code == 200
+        with session_scope(app.state.engine) as session:
+            set_role(session, identities["editor"], None)
+        assert client.get(DATASETS, headers=editor).status_code == 403
+        assert client.get(DATASETS, headers=other).status_code == 200
