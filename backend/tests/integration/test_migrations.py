@@ -21,5 +21,6 @@ def test_migrations_create_schema_matching_models(tmp_path: Path) -> None:
         "pipeline_stage_runs",
         "quality_results",
         "audit_events",
+        "documents",
     } <= tables
     assert pending_model_changes(url) == []

@@ -252,3 +252,13 @@ class AuditEvent(Base):
         CheckConstraint("outcome IN ('success','denied','error')", name="ck_audit_outcome"),
         Index("ix_audit_org_time", "org_id", "occurred_at"),
     )
+
+
+class Document(Base):
+    __tablename__ = "documents"
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True
+    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200))
+    content: Mapped[str] = mapped_column(Text)

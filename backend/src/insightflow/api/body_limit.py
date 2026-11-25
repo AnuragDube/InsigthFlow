@@ -21,12 +21,19 @@ class _BodyTooLarge(Exception):
 
 
 class BodySizeLimitMiddleware:
-    def __init__(self, app: ASGIApp, max_bytes: int, limit_mb: int) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        max_bytes: int,
+        limit_mb: int,
+        route_limits: dict[tuple[str, str], tuple[int, str]] | None = None,
+    ) -> None:
         self.app = app
         self.max_bytes = max_bytes
         self.limit_mb = limit_mb
+        self.route_limits = route_limits or {}
 
-    async def _reject(self, scope: Scope, send: Send) -> None:
+    async def _reject(self, scope: Scope, send: Send, detail: str) -> None:
         headers = dict(scope.get("headers") or [])
         incoming = headers.get(b"x-correlation-id", b"")
         cid = incoming.decode() if _SAFE_CID.match(incoming) else uuid.uuid4().hex
@@ -35,7 +42,7 @@ class BodySizeLimitMiddleware:
                 "type": "/errors/payload-too-large",
                 "title": "Payload too large",
                 "status": 413,
-                "detail": f"Request bodies are limited to {self.limit_mb} MB.",
+                "detail": detail,
                 "correlation_id": cid,
             }
         ).encode()
@@ -57,9 +64,13 @@ class BodySizeLimitMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
+        max_bytes, detail = self.route_limits.get(
+            (scope["method"], scope["path"].rstrip("/")),
+            (self.max_bytes, f"Request bodies are limited to {self.limit_mb} MB."),
+        )
         declared = dict(scope.get("headers") or []).get(b"content-length")
-        if declared is not None and declared.isdigit() and int(declared) > self.max_bytes:
-            await self._reject(scope, send)
+        if declared is not None and declared.isdigit() and int(declared) > max_bytes:
+            await self._reject(scope, send, detail)
             return
 
         received = 0
@@ -71,7 +82,7 @@ class BodySizeLimitMiddleware:
             message = await receive()
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
-                if received > self.max_bytes:
+                if received > max_bytes:
                     exceeded = True
                     raise _BodyTooLarge
             return message
@@ -82,7 +93,7 @@ class BodySizeLimitMiddleware:
                 # Whatever the app made of the aborted body (400/500), the answer is 413.
                 if message["type"] == "http.response.start" and not started:
                     started = True
-                    await self._reject(scope, send)
+                    await self._reject(scope, send, detail)
                 return
             if message["type"] == "http.response.start":
                 started = True
@@ -92,4 +103,4 @@ class BodySizeLimitMiddleware:
             await self.app(scope, limited_receive, guarded_send)
         except _BodyTooLarge:
             if not started:
-                await self._reject(scope, send)
+                await self._reject(scope, send, detail)

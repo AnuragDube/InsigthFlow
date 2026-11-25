@@ -3,13 +3,15 @@ import { useEffect, useState } from "react";
 import { api } from "./api/client";
 import type { Dataset, Page } from "./api/types";
 import { Data } from "./pages/Data";
+import { Documents } from "./pages/Documents";
 import { Overview } from "./pages/Overview";
 import { Questions } from "./pages/Questions";
 
-type Tab = "overview" | "data" | "questions";
+type Tab = "overview" | "data" | "questions" | "documents";
 function tabFromHash(): Tab {
   const hash = window.location.hash;
   if (hash === "#data") return "data";
+  if (hash === "#documents") return "documents";
   return hash === "#questions" ? "questions" : "overview";
 }
 
@@ -94,9 +96,9 @@ export function App() {
         <div className="brand">
           Insight<span>Flow</span>
         </div>
-        {current && (
-          <>
-            <nav className="tabs" aria-label="Sections">
+        <nav className="tabs" aria-label="Sections">
+          {current ? (
+            <>
               <button type="button" className="tab" aria-current={tab === "overview" ? "page" : undefined} onClick={() => go("overview")}>
                 Overview
               </button>
@@ -106,8 +108,17 @@ export function App() {
               <button type="button" className="tab" aria-current={tab === "questions" ? "page" : undefined} onClick={() => go("questions")}>
                 Ask
               </button>
-            </nav>
-            {items.length > 1 && (
+            </>
+          ) : (
+            <button type="button" className="tab" aria-current={tab !== "documents" ? "page" : undefined} onClick={() => go("overview")}>
+              Home
+            </button>
+          )}
+          <button type="button" className="tab" aria-current={tab === "documents" ? "page" : undefined} onClick={() => go("documents")}>
+            Documents
+          </button>
+        </nav>
+        {current && tab !== "documents" && items.length > 1 && (
               <label className="field">
                 Dataset
                 <select value={current.id} onChange={(e) => setChosen(e.target.value)}>
@@ -118,14 +129,12 @@ export function App() {
                   ))}
                 </select>
               </label>
-            )}
-          </>
         )}
       </header>
       <main>
         {datasets.error && <p className="notice error">Can’t reach the API: {datasets.error.message}</p>}
         {datasets.isLoading && <p className="hint">Loading…</p>}
-        {datasets.data && !current && (
+        {datasets.data && !current && tab !== "documents" && (
           <Welcome
             onReady={(id, t) => {
               setChosen(id);
@@ -133,6 +142,7 @@ export function App() {
             }}
           />
         )}
+        {tab === "documents" && <Documents />}
         {current && tab === "overview" && <Overview key={current.id} datasetId={current.id} onOpenData={() => go("data")} />}
         {current && tab === "questions" && <Questions key={current.id} datasetId={current.id} />}
         {current && tab === "data" && (
