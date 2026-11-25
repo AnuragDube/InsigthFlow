@@ -69,6 +69,16 @@ export function Overview({ datasetId, onOpenData }: { datasetId: string; onOpenD
       </section>
     );
   }
+  if (q.error instanceof ApiError && q.error.type === "/errors/validation-failed" && range.from) {
+    return (
+      <div className="actions">
+        <p className="notice error">{q.error.message}</p>
+        <button type="button" className="btn" onClick={() => { setPreset("all"); setRange({}); }}>
+          Reset date range
+        </button>
+      </div>
+    );
+  }
   if (q.error) return <p className="notice error">{q.error.message}</p>;
   if (!q.data) return <p className="hint" aria-busy="true">Loading the dashboard…</p>;
 
@@ -93,7 +103,7 @@ export function Overview({ datasetId, onOpenData }: { datasetId: string; onOpenD
         <div className="presets" role="group" aria-label="Period">
           {PRESETS.map((p) => (
             <button key={p.id} type="button" className="chip" aria-pressed={preset === p.id} onClick={() => choose(p.id)}>
-              {p.label}
+              {p.id === "all" && d.range.default_limited ? "Latest data" : p.label}
             </button>
           ))}
         </div>

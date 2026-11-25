@@ -16,7 +16,7 @@ import duckdb
 from sqlalchemy.engine import Engine
 
 from insightflow.core.context import OrgContext
-from insightflow.core.errors import NoPublishedData
+from insightflow.core.errors import NoPublishedData, PublishedDataUnavailable
 from insightflow.core.settings import Settings
 from insightflow.metadata.db import session_scope
 from insightflow.metadata.repositories import DataSourceRepo
@@ -39,7 +39,21 @@ def open_gold(
 ) -> duckdb.DuckDBPyConnection:
     with session_scope(engine) as s:
         run_id = DataSourceRepo(s).get(ctx, source_id).published_run_id
+    return open_gold_run(ctx, settings, source_id, run_id)
+
+
+def open_gold_run(
+    ctx: OrgContext, settings: Settings, source_id: uuid.UUID, run_id: uuid.UUID | None
+) -> duckdb.DuckDBPyConnection:
+    """Open a publication already resolved from org-scoped metadata by the caller."""
     if run_id is None:
         raise NoPublishedData("This dataset has no published data yet. Run the pipeline first.")
     path = OrgPaths(settings.data_dir, ctx.org_id).gold_db(source_id, run_id)
-    return duckdb.connect(str(path), read_only=True, config=sandbox_config(settings))
+    try:
+        return duckdb.connect(str(path), read_only=True, config=sandbox_config(settings))
+    except duckdb.IOException as exc:
+        if not path.is_file():
+            raise PublishedDataUnavailable(
+                "The published data file is missing. Rebuild the dataset and try again."
+            ) from exc
+        raise

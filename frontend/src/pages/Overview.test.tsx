@@ -65,3 +65,13 @@ it("invites the user to load data when nothing is published yet", async () => {
   renderWithQuery(<Overview datasetId="d1" onOpenData={() => {}} />);
   expect(await screen.findByRole("button", { name: "Add data" })).toBeInTheDocument();
 });
+
+it("labels a capped default as latest data", async () => {
+  const capped = { ...dashboard, range: { ...dashboard.range, default_limited: true } };
+  mockFetch((url) => (url.includes("/dashboard") ? { body: capped } : undefined));
+  renderWithQuery(<Overview datasetId="d1" onOpenData={() => {}} />);
+  expect(await screen.findByRole("button", { name: "Latest data" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});

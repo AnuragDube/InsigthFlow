@@ -24,9 +24,10 @@ from insightflow.core.errors import NotFoundError, ValidationFailed
 from insightflow.core.settings import Settings
 from insightflow.metadata.db import session_scope
 from insightflow.metadata.repositories import DataSourceRepo, RunRepo
-from insightflow.warehouse.engine import open_gold
+from insightflow.warehouse.engine import open_gold, open_gold_run
 
 DAILY_TREND_MAX_DAYS = 62
+MAX_ANALYTICS_DAYS = 3660
 
 
 def as_number(v: Value) -> float | int | None:
@@ -48,9 +49,12 @@ class DateRange:
     def days(self) -> int:
         return (self.end - self.start).days + 1
 
-    def previous(self) -> tuple[date, date]:
+    def previous(self) -> tuple[date, date] | None:
+        if self.start <= self.min:
+            return None
         prev_end = self.start - timedelta(days=1)
-        return prev_end - timedelta(days=self.days - 1), prev_end
+        prev_start = date.fromordinal(max(1, self.start.toordinal() - self.days))
+        return prev_start, prev_end
 
 
 def metrics_for(engine: Engine, ctx: OrgContext, source_id: uuid.UUID) -> dict[str, Metric]:
@@ -72,8 +76,14 @@ def _resolve(con: duckdb.DuckDBPyConnection, start: date | None, end: date | Non
     if lo is None or hi is None:
         raise ValidationFailed("The published dataset has no dates.")
     first, last = start or lo, end or hi
+    if start is None and end is None and (hi - lo).days >= MAX_ANALYTICS_DAYS:
+        first = hi - timedelta(days=MAX_ANALYTICS_DAYS - 1)
     if first > last:
         raise ValidationFailed("'from' must be on or before 'to'.")
+    if last == date.max:
+        raise ValidationFailed("'to' must be before 9999-12-31.")
+    if (last - first).days >= MAX_ANALYTICS_DAYS:
+        raise ValidationFailed(f"Date ranges may include up to {MAX_ANALYTICS_DAYS} days.")
     return DateRange(start=first, end=last, min=lo, max=hi)
 
 
@@ -92,21 +102,22 @@ def dashboard(
     start: date | None,
     end: date | None,
 ) -> dict[str, object]:
-    metrics = metrics_for(engine, ctx, source_id)
     with session_scope(engine) as s:
-        run_id = DataSourceRepo(s).get(ctx, source_id).published_run_id
-        run = RunRepo(s).get(ctx, run_id) if run_id else None
-        quality = RunRepo(s).quality(ctx, run_id) if run_id else []
+        source = DataSourceRepo(s).get(ctx, source_id)
+        domain, run_id = source.domain, source.published_run_id
+        runs = RunRepo(s)
+        run = runs.get(ctx, run_id) if run_id else None
+        quality = runs.quality(ctx, run_id) if run_id else []
         finished: datetime | None = run.finished_at if run else None
-    con = open_gold(ctx, engine, settings, source_id)  # raises NoPublishedData
+    metrics = load_metrics(domain)
+    con = open_gold_run(ctx, settings, source_id, run_id)
     try:
         rng = _resolve(con, start, end)
         current = compute_kpis(con, metrics, rng.start, rng.end)
-        prev_start, prev_end = rng.previous()
-        # A period entirely before the data has no values (not "0 orders"): no comparison.
+        prev_range = rng.previous()
         previous = (
-            compute_kpis(con, metrics, prev_start, prev_end)
-            if prev_end >= rng.min
+            compute_kpis(con, metrics, *prev_range)
+            if prev_range is not None
             else dict.fromkeys(metrics)
         )
         grain: Grain = "day" if rng.days <= DAILY_TREND_MAX_DAYS else "month"
@@ -117,7 +128,13 @@ def dashboard(
     finally:
         con.close()
     return {
-        "range": {"from": rng.start, "to": rng.end, "min": rng.min, "max": rng.max},
+        "range": {
+            "from": rng.start,
+            "to": rng.end,
+            "min": rng.min,
+            "max": rng.max,
+            "default_limited": (rng.max - rng.min).days >= MAX_ANALYTICS_DAYS,
+        },
         "kpis": [
             {
                 "name": m.name,

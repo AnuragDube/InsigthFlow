@@ -38,5 +38,9 @@ class NoPublishedData(ConflictError):
     type_slug, title = "no-published-data", "No published data"
 
 
+class PublishedDataUnavailable(AppError):
+    status, type_slug, title = 503, "published-data-unavailable", "Published data unavailable"
+
+
 class PayloadTooLarge(AppError):
     status, type_slug, title = 413, "payload-too-large", "Payload too large"

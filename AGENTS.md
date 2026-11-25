@@ -3,8 +3,9 @@
 Read [project status](docs/STATUS.md), [project rules](CLAUDE.md), the relevant
 [ADRs](docs/decisions/README.md), and the active milestone before making changes. Check the current
 branch, working tree, and upstream history. Preserve existing working code and user edits. Work on
-a topic branch, keep commits small, and obtain owner approval before moving to the next phase,
-deploying externally, spending money, changing credential requirements, or taking destructive actions.
+a topic branch, keep commits small, and proceed through authorized milestones after their checks pass.
+Obtain owner approval for consequential architectural changes, destructive actions, spending,
+credential changes, external deployment, or merging into main.
 
 ## Product and architecture
 

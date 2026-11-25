@@ -2,13 +2,21 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
+from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 
 from insightflow.api.app import create_app
+from insightflow.core.context import OrgContext
 from insightflow.core.settings import Settings
-from pipeline_helpers import published_fixture_gold
+from insightflow.domains.loader import load_domain_pack
+from insightflow.metadata.db import session_scope
+from insightflow.metadata.models import QualityResult
+from insightflow.metadata.repositories import DataSourceRepo, RunRepo
+from insightflow.pipeline.service import request_run, run_pipeline
+from insightflow.warehouse.paths import OrgPaths
+from pipeline_helpers import ingest_fixtures, published_fixture_gold, setup_source
 
 H = {"X-InsightFlow-Client": "web"}
 
@@ -40,6 +48,7 @@ def test_dashboard_defaults_to_full_range(client: TestClient, ds: uuid.UUID) -> 
     body = client.get(f"/api/v1/datasets/{ds}/dashboard").json()
     assert body["range"] == {
         "from": "2010-12-01", "to": "2010-12-06", "min": "2010-12-01", "max": "2010-12-06",
+        "default_limited": False,
     }  # fmt: skip
     g = kpi(body, "gross_revenue")
     assert g["value"] == pytest.approx(140.445) and g["unit"] == "GBP"
@@ -62,6 +71,82 @@ def test_dashboard_compares_with_previous_period(client: TestClient, ds: uuid.UU
     assert g["value"] == pytest.approx(50.805)
     assert g["previous"] == pytest.approx(89.64)  # 2010-12-01..03
     assert g["change"] == pytest.approx((50.805 - 89.64) / 89.64)
+
+
+def test_dashboard_pins_gold_when_publication_changes(
+    client: TestClient, settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    engine, ctx, source_id = setup_source(settings)
+    ingest_fixtures(settings, engine, ctx, source_id, names=("batch_b.csv",))
+    first = request_run(ctx, engine, source_id, trigger="manual")
+    assert first is not None
+    assert run_pipeline(ctx, engine, settings, first.id)[-1].status == "succeeded"
+
+    ingest_fixtures(settings, engine, ctx, source_id, names=("batch_a.csv",))
+    second = request_run(ctx, engine, source_id, trigger="manual")
+    assert second is not None
+    pack = load_domain_pack("ecommerce").with_threshold("quarantine_ratio", 0.2)
+    assert run_pipeline(ctx, engine, settings, second.id, pack=pack)[-1].status == "succeeded"
+    with session_scope(engine) as session:
+        DataSourceRepo(session).get(ctx, source_id).published_run_id = first.id
+
+    original_quality = RunRepo.quality
+
+    def quality_and_publish(
+        repo: RunRepo, org: OrgContext, run_id: uuid.UUID
+    ) -> list[QualityResult]:
+        quality = original_quality(repo, org, run_id)
+        with session_scope(engine) as session:
+            DataSourceRepo(session).get(ctx, source_id).published_run_id = second.id
+        return quality
+
+    monkeypatch.setattr(RunRepo, "quality", quality_and_publish)
+    response = client.get(f"/api/v1/datasets/{source_id}/dashboard")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["freshness"]["run_id"] == str(first.id)
+    assert kpi(body, "gross_revenue")["value"] == pytest.approx(75.75)
+
+
+def test_missing_published_file_is_503(client: TestClient, settings: Settings) -> None:
+    engine, ctx, source_id = published_fixture_gold(settings)
+    with session_scope(engine) as session:
+        run_id = DataSourceRepo(session).get(ctx, source_id).published_run_id
+    assert run_id is not None
+    path = OrgPaths(settings.data_dir, ctx.org_id).gold_db(source_id, run_id)
+    path.unlink()
+    for endpoint in ("dashboard", "metrics/orders/series"):
+        response = client.get(f"/api/v1/datasets/{source_id}/{endpoint}")
+        assert response.status_code == 503
+        assert response.headers["content-type"].startswith("application/problem+json")
+        assert response.json()["type"] == "/errors/published-data-unavailable"
+        assert str(path) not in response.text
+
+
+def test_date_limit_bounds_daily_series(client: TestClient, ds: uuid.UUID) -> None:
+    path = f"/api/v1/datasets/{ds}/metrics/orders/series"
+    start = date(2010, 12, 1)
+    at_limit = client.get(
+        path, params={"from": start, "to": start + timedelta(days=3659), "grain": "day"}
+    )
+    assert at_limit.status_code == 200
+    assert len(at_limit.json()["points"]) == 3660
+    for params in (
+        {"from": start, "to": start + timedelta(days=3660)},
+        {"to": date(2050, 1, 1)},
+        {"from": date(9999, 12, 31), "to": date(9999, 12, 31)},
+    ):
+        result = client.get(path, params=params)
+        assert result.status_code == 422
+        assert result.json()["type"] == "/errors/validation-failed"
+
+
+def test_dashboard_handles_earliest_calendar_day(client: TestClient, ds: uuid.UUID) -> None:
+    response = client.get(
+        f"/api/v1/datasets/{ds}/dashboard", params={"from": "0001-01-01", "to": "0001-01-01"}
+    )
+    assert response.status_code == 200
+    assert all(item["previous"] is None for item in response.json()["kpis"])
 
 
 def test_reversed_range_is_422(client: TestClient, ds: uuid.UUID) -> None:

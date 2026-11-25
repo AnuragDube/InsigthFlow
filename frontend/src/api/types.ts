@@ -85,7 +85,7 @@ export interface Ranked {
 }
 
 export interface Dashboard {
-  range: { from: string; to: string; min: string; max: string };
+  range: { from: string; to: string; min: string; max: string; default_limited?: boolean };
   kpis: Kpi[];
   trend: { metric: string; grain: "day" | "month"; points: { period: string; value: number | null }[] };
   top_products: Ranked[];

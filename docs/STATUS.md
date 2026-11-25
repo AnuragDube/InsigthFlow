@@ -2,10 +2,9 @@
 
 Updated 25 November 2026 (IST). Interview on Friday, 27 November 2026.
 
-**M1 data foundation and M2 metrics dashboard are implemented.** The November 27 priority is a
-rehearsed, offline-capable M2 demo on Windows 11. The next engineering milestone is an M2 reliability
-pass, followed by an offline-first NL-to-SQL milestone if approved. Keep the current application
-local and use public or synthetic demo data.
+**M1 data foundation and M2 metrics dashboard are implemented.** The M2 reliability changes
+passed Linux validation. The November 27 priority is a rehearsed, offline-capable M2 demo
+on Windows 11. Keep the current application local and use public or synthetic demo data.
 
 ## Branch and design review
 
@@ -14,6 +13,7 @@ local and use public or synthetic demo data.
 | Remote default and `m1-data-foundation` | `b796cb4`, including the M1 publication note |
 | `m2-dashboard` | `be8a16e`, eight commits after the shared base `950e869`. Adds metrics, API, SPA and CI coverage |
 | Audit | `audit/lead-engineering-2026-11-25`, based on M2. The M1-only publication note was reconciled here |
+| Reliability | `fix/m2-dashboard-reliability`, based on the audit branch |
 
 Remote branch discovery returned those two branches and no `main` branch. The selected starting
 checkout was local `work` at the M1 tip. Phase 1 was approved on 24 November. The architecture,
@@ -39,6 +39,18 @@ CI results, and PostgreSQL runtime validation were outside this Linux run. The e
 [Data Profile](DATA_PROFILE.md). A fresh Linux M2 run downloaded and verified the UCI archive, processed 1,067,371
 Silver input rows, published after all 9 checks passed, and returned 10 dashboard KPIs with the
 published run ID.
+
+### Reliability branch verification
+
+- `uv run --frozen pytest -o addopts='' -ra` collected and passed **123 tests in 21.55 s**.
+  Ruff lint passed, all 74 Python files were formatted, and mypy checked 55 source files.
+- `npm run typecheck`, `npm test` and `npm run build` passed on Node 24.22.3.
+  Vitest passed **14 tests in 3 files**. The existing Vite chunk-size warning remains.
+- `npm run e2e` with an ephemeral configuration for system Chromium 156.0.8078.79
+  passed **2 tests in 5.8 s** across desktop and phone.
+- The checksum-verified UCI sample was loaded into an isolated SQLite store through the
+  current API. The new run published after all nine quality checks passed. The dashboard
+  returned ten KPIs and identified that same run.
 
 ## Capability inventory
 
@@ -70,8 +82,8 @@ published run ID.
 | Priority | Finding | Before closing it |
 |---|---|---|
 | Release blocker | All HTTP calls resolve to the demo org. The custom mutation header, explicit CORS, trusted hosts, body cap and CSP harden a local demo. ADR-0016 auth/RBAC and the designed public read-only mode are absent. | Loopback only. Require authentication, authorization and cross-org HTTP tests before handling customer data or exposing a service. |
-| High | Dashboard freshness and quality resolve a published run, then `open_gold` reads the pointer again in another transaction. Code review found a possible mismatch if a publish lands between reads. Missing Gold artifacts currently reach the generic 500 handler. | Pin metadata and Gold to one run for the duration of a request. Test publication overlap and explicit missing-artifact behavior. |
-| High before shared deployment | Analytics accepts arbitrary date spans. The series materializes the requested date spine, and endpoint-level deadlines and concurrency budgets are absent. Uploads cap the body and spool size, but header reads can consume the whole allowed body, and cumulative storage is unbounded. | Bound analytics ranges and work, cap header length, add storage quotas and define safe retention before sharing. |
+| Addressed on reliability branch | Dashboard freshness, quality and results share a run ID, including when a new publication arrives mid-request. Missing published Gold files return a safe 503. | Windows rehearsal remains open. |
+| High before shared deployment | Analytics limits ranges to 3,660 days. Endpoint-level deadlines and concurrency budgets are absent. Uploads cap the body and spool size, but header reads can consume the whole allowed body, and cumulative storage is unbounded. | Bound query work, cap header length, add storage quotas and define safe retention before sharing. |
 | High before parallel workers | Startup recovery treats all active runs as interrupted. Artifact pruning and local storage assume single-process ownership. A process killed before the ingest transaction commits can leave unreferenced files. | Retain one process for now. Test reconciliation and restore, and add durable claims only when a second worker is necessary. |
 | Medium | Revenue reconciliation shares Silver eligibility flags with Gold. The overlap warning uses a nonnegative threshold and serves as telemetry. Bronze manifest lacks receipt time and row lineage lacks file/time fields. Country names are trim-only. | Add independent control totals and lineage. Preserve raw values and confirm normalization policy. |
 | Medium | Repeated sample loads can enqueue an unchanged rebuild. Date parsing quarantines ambiguous Excel-style values. Re-uploading an inactive batch keeps it inactive. | Confirm intended UX, document it and cover approved behavior with regressions. |
@@ -98,10 +110,10 @@ and rate limits remain future work. This audit used code review and the reposito
 
 ### Recommended next engineering milestone
 
-**M2 reliability and sign-off.** Complete the Windows rehearsal, pin dashboard reads to a
-publication, handle missing artifacts explicitly, and add date-range limits with focused
-regressions. Acceptance is a fixture-backed Windows run, matching dashboard and quality
-provenance, and the current CI suite passing. Keep the existing Overview and Data UI.
+**M2 Windows sign-off.** Rehearse the fixture-backed flow on Windows 11 with Node 22 and Python
+3.12, including a successful publish followed by a blocked fixture. The publication consistency,
+missing artifact and range limit changes have passed the Linux quality gates. After the interview,
+use the commercial sequence below to prioritize the next implementation.
 
 ## Commercial sequence after the interview
 
@@ -141,5 +153,4 @@ isolated flow on Linux, including **£75.75 gross revenue from 4 orders**. Windo
 these commands is part of rehearsal.
 
 Use the [Windows PowerShell quickstart](../README.md#quickstart-windows-11-powershell). Application
-checks use local fixtures and require no credentials. The previous cloud push limitation is
-historical, and this audit is committed on its local topic branch.
+checks use local fixtures and require no credentials. Both topic branches are local.
