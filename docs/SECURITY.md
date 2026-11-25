@@ -4,12 +4,24 @@ Status: Draft for approval (Phase 1) · Last updated: 2026-11-24
 
 ## 1. Security posture by phase (be honest about it)
 
-The M5 branch introduces an injectable principal resolver and server-side role checks. With a
-resolver, missing identities receive 401 and inactive or unknown organizations receive 403.
-Foreign resources remain unavailable to otherwise authorized callers. Without a resolver the
-local demo uses its configured demo organization. The resolver contract presumes a trusted
-server-side identity integration. Never implement it by accepting organization IDs or roles
-asserted directly by the client.
+The M5 app factory accepts a trusted identity resolver. Missing identities receive 401. The
+application loads the role from the membership table by organization, verified issuer, and
+verified subject. An unassigned identity or inactive workspace receives 403. A client can
+request a workspace only through a server-side integration that verifies the identity first.
+The resolver returns no role. Foreign resources remain unavailable to authorized callers.
+Without a resolver, the local demo uses its configured demo organization.
+
+A trusted database operator runs these commands using the application's database settings.
+Issuer and subject are the stable identifiers produced by the sign-in integration.
+
+```bash
+uv run --frozen python scripts/manage_workspace.py create pilot "Pilot Workspace"
+uv run --frozen python scripts/manage_workspace.py grant pilot example-issuer example-subject editor
+uv run --frozen python scripts/manage_workspace.py revoke pilot example-issuer example-subject
+```
+
+Granting a new role replaces the previous role. Revocation applies to subsequent requests,
+including requests from a still-valid identity session.
 
 | Phase | Posture | Allowed exposure |
 |---|---|---|

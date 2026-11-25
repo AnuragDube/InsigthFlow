@@ -2,29 +2,29 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Annotated, Literal
+from typing import Annotated
+from uuid import UUID
 
 from fastapi import Depends, Request
 from sqlalchemy.engine import Engine
 
 from insightflow.analytics.question_provider import QuestionProvider
-from insightflow.core.context import OrgContext
+from insightflow.core.context import OrgContext, Role, VerifiedIdentity
 from insightflow.core.errors import AuthenticationRequired, ForbiddenError
 from insightflow.core.settings import Settings
 from insightflow.metadata.db import session_scope
-from insightflow.metadata.models import Organization
+from insightflow.metadata.memberships import role_for
 
 
 @dataclass(frozen=True)
 class Principal:
-    org_id: uuid.UUID
-    role: Literal["owner", "editor", "viewer"]
+    org_id: UUID
+    role: Role
 
 
-PrincipalResolver = Callable[[Request], Principal | None]
+IdentityResolver = Callable[[Request], VerifiedIdentity | None]
 
 
 def get_settings_dep(request: Request) -> Settings:
@@ -43,20 +43,18 @@ def get_question_provider(request: Request) -> QuestionProvider | None:
 
 
 def get_principal(request: Request, engine: Annotated[Engine, Depends(get_engine)]) -> Principal:
-    resolver: PrincipalResolver | None = request.app.state.principal_resolver
+    resolver: IdentityResolver | None = request.app.state.identity_resolver
     if resolver is None:
         ctx: OrgContext = request.app.state.demo_ctx
         return Principal(ctx.org_id, "owner")
-    principal = resolver(request)
-    if principal is None:
+    identity = resolver(request)
+    if identity is None:
         raise AuthenticationRequired("Sign in to access this workspace.")
     with session_scope(engine) as session:
-        organization = session.get(Organization, principal.org_id)
-        if organization is None or organization.status != "active":
-            raise ForbiddenError("This workspace is unavailable.")
-    if principal.role not in {"owner", "editor", "viewer"}:
+        role = role_for(session, identity)
+    if role is None:
         raise ForbiddenError("You do not have access to this workspace.")
-    return principal
+    return Principal(identity.org_id, role)
 
 
 Authenticated = Annotated[Principal, Depends(get_principal)]
