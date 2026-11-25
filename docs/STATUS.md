@@ -26,6 +26,12 @@ and a workspace sign-in screen using OAuth authorization code with PKCE. Integra
 exercise the callback with a simulated provider and locally signed tokens. Selecting and
 connecting a live provider, then verifying sign-in against that provider, remain open.
 
+**M6 forecasting baseline is implemented.** The Forecast tab compares the previous-week
+seasonal baseline with a four-week matching-weekday average for the next seven days of gross
+revenue. Both methods are evaluated on up to four held-out weekly windows. The feature uses
+only published data, requires at least 35 calendar days, and treats days without sales as zero.
+This is an offline benchmark. The newest sales day may be incomplete.
+
 M5 Linux verification passed **152 backend tests in 25.34 s**, along with Ruff lint,
 formatting, and mypy. The authorization test covers all seven mutation routes and
 cross-organization access to published analysis and documents.
@@ -46,6 +52,7 @@ cross-organization access to published analysis and documents.
 | M5 browser sessions | `feat/m5-browser-sessions`, based on merged memberships at `4dc67c2` |
 | M5 token verification | `feat/m5-token-verification`, based on merged browser sessions at `0d3052c` |
 | M5 interactive sign-in | `feat/m5-interactive-sign-in`, based on merged token verification at `cba7bdf` |
+| M6 sales forecast | `feat/m6-sales-forecast`, based on merged interactive sign-in at `0ff9fd1` |
 
 Remote branch discovery returned those two branches and no `main` branch. The selected starting
 checkout was local `work` at the M1 tip. Phase 1 was approved on 24 November. The architecture,

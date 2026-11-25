@@ -4,13 +4,15 @@ import { ApiError, api } from "./api/client";
 import type { Dataset, Page } from "./api/types";
 import { Data } from "./pages/Data";
 import { Documents } from "./pages/Documents";
+import { Forecast } from "./pages/Forecast";
 import { Overview } from "./pages/Overview";
 import { Questions } from "./pages/Questions";
 
-type Tab = "overview" | "data" | "questions" | "documents";
+type Tab = "overview" | "data" | "questions" | "documents" | "forecast";
 function tabFromHash(): Tab {
   const hash = window.location.hash;
   if (hash === "#data") return "data";
+  if (hash === "#forecast") return "forecast";
   if (hash === "#documents") return "documents";
   return hash === "#questions" ? "questions" : "overview";
 }
@@ -146,6 +148,9 @@ export function App() {
               <button type="button" className="tab" aria-current={tab === "questions" ? "page" : undefined} onClick={() => go("questions")}>
                 Ask
               </button>
+              <button type="button" className="tab" aria-current={tab === "forecast" ? "page" : undefined} onClick={() => go("forecast")}>
+                Forecast
+              </button>
             </>
           ) : (
             <button type="button" className="tab" aria-current={tab !== "documents" ? "page" : undefined} onClick={() => go("overview")}>
@@ -188,6 +193,7 @@ export function App() {
         )}
         {tab === "documents" && <Documents />}
         {current && tab === "overview" && <Overview key={current.id} datasetId={current.id} onOpenData={() => go("data")} />}
+        {current && tab === "forecast" && <Forecast key={current.id} datasetId={current.id} runId={current.published_run_id} />}
         {current && tab === "questions" && <Questions key={current.id} datasetId={current.id} />}
         {current && tab === "data" && (
           <>

@@ -20,6 +20,7 @@ from insightflow.analytics.compiler import (
     compute_metric_with_sql,
     compute_series,
 )
+from insightflow.analytics.forecast import MAX_HISTORY, forecast_week
 from insightflow.analytics.question_provider import (
     MetricOption,
     OfflineQuestionProvider,
@@ -283,4 +284,29 @@ def breakdown(
         "metric": name,
         "dimension": dimension,
         "items": [{"key": k, "label": lbl, "value": as_number(v)} for k, lbl, v in rows],
+    }
+
+
+def sales_forecast(
+    ctx: OrgContext, engine: Engine, settings: Settings, source_id: uuid.UUID
+) -> dict[str, object]:
+    with session_scope(engine) as session:
+        source = DataSourceRepo(session).get(ctx, source_id)
+        domain, run_id = source.domain, source.published_run_id
+    metric = get_metric(load_metrics(domain), "gross_revenue")
+    with open_gold_run(ctx, settings, source_id, run_id) as con:
+        bounds = _resolve(con, None, None)
+        start = date.fromordinal(
+            max(bounds.min.toordinal(), bounds.end.toordinal() - MAX_HISTORY + 1)
+        )
+        series = compute_series(con, metric, start, bounds.end, "day")
+    points, backtest = forecast_week([float(value or 0) for _, value in series], bounds.end)
+    return {
+        "metric": metric.name,
+        "unit": metric.unit,
+        "published_run_id": run_id,
+        "history_from": start,
+        "as_of": bounds.end,
+        "points": points,
+        "backtest": backtest,
     }
