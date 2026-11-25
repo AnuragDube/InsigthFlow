@@ -27,6 +27,7 @@ from insightflow.analytics.question_provider import (
     QuestionProvider,
 )
 from insightflow.analytics.registry import Metric, load_metrics
+from insightflow.analytics.segments import LOOKBACK_DAYS, compute_segments
 from insightflow.core.context import OrgContext
 from insightflow.core.errors import NotFoundError, ValidationFailed
 from insightflow.core.settings import Settings
@@ -309,4 +310,25 @@ def sales_forecast(
         "as_of": bounds.end,
         "points": points,
         "backtest": backtest,
+    }
+
+
+def customer_segments(
+    ctx: OrgContext, engine: Engine, settings: Settings, source_id: uuid.UUID
+) -> dict[str, object]:
+    with session_scope(engine) as session:
+        source = DataSourceRepo(session).get(ctx, source_id)
+        run_id = source.published_run_id
+    with open_gold_run(ctx, settings, source_id, run_id) as con:
+        bounds = _resolve(con, None, None)
+        start = date.fromordinal(
+            max(bounds.min.toordinal(), bounds.end.toordinal() - LOOKBACK_DAYS + 1)
+        )
+        segments = compute_segments(con, start, bounds.end)
+    return {
+        "published_run_id": run_id,
+        "from": start,
+        "as_of": bounds.end,
+        "unit": "GBP",
+        "segments": segments,
     }

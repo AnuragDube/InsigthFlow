@@ -112,3 +112,10 @@ def metric_breakdown(
 @router.get("/datasets/{dataset_id}/forecast")
 def sales_forecast(dataset_id: uuid.UUID, ctx: Ctx, engine: Eng, settings: Cfg) -> dict[str, Any]:
     return service.sales_forecast(ctx, engine, settings, dataset_id)
+
+
+@router.get("/datasets/{dataset_id}/customer-segments")
+def customer_segments(
+    dataset_id: uuid.UUID, ctx: Ctx, engine: Eng, settings: Cfg
+) -> dict[str, Any]:
+    return service.customer_segments(ctx, engine, settings, dataset_id)

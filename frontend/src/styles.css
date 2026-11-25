@@ -73,7 +73,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 .brand { font-weight: 700; letter-spacing: -0.01em; margin-right: auto; }
 .brand span { color: var(--ledger); }
-.tabs { display: flex; gap: 0.25rem; }
+.tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 .tab {
   background: none; border: 0; padding: 0.4rem 0.75rem; border-radius: var(--radius);
   color: var(--ink-soft); cursor: pointer;

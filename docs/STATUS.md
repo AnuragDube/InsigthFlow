@@ -32,6 +32,11 @@ revenue. Both methods are evaluated on up to four held-out weekly windows. The f
 only published data, requires at least 35 calendar days, and treats days without sales as zero.
 This is an offline benchmark. The newest sales day may be incomplete.
 
+**M6 customer segmentation is implemented.** The Customers tab summarizes known purchasers
+from up to 90 calendar days of published sales using recency, distinct order count, and gross
+spend. Four fixed rules make the groups easy to explain. These are descriptive segments.
+Learned clustering and inactivity prediction remain separate roadmap items.
+
 M5 Linux verification passed **152 backend tests in 25.34 s**, along with Ruff lint,
 formatting, and mypy. The authorization test covers all seven mutation routes and
 cross-organization access to published analysis and documents.
@@ -40,7 +45,7 @@ cross-organization access to published analysis and documents.
 
 | Ref | Evidence |
 |---|---|
-| Remote default and `m1-data-foundation` | `55ec08c`, including merged M3 and M4 |
+| Remote default and `m1-data-foundation` | `4d7f658`, including the merged M6 forecast |
 | `m2-dashboard` | `be8a16e`, eight commits after the shared base `950e869`. Adds metrics, API, SPA and CI coverage |
 | Audit | `audit/lead-engineering-2026-11-25`, based on M2. The M1-only publication note was reconciled here |
 | Reliability | `fix/m2-dashboard-reliability`, based on the audit branch |
