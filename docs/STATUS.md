@@ -16,17 +16,28 @@ activation and broader natural-language interpretation remain open.
 returns matching excerpts with source line numbers, and supports removal. It runs locally with BM25
 and returns an empty result when lexical evidence is insufficient.
 
+**M5 private-pilot authorization has started.** The app factory can accept a trusted
+server-side principal resolver. A configured resolver must authenticate requests and return an
+active organization and role. Viewers may read, ask questions, and search documents. Editors
+and owners may mutate datasets and documents. The default app remains a localhost demo. The
+sign-in provider, membership administration, and session lifecycle remain open.
+
+M5 Linux verification passed **152 backend tests in 25.34 s**, along with Ruff lint,
+formatting, and mypy. The authorization test covers all seven mutation routes and
+cross-organization access to published analysis and documents.
+
 ## Branch and design review
 
 | Ref | Evidence |
 |---|---|
-| Remote default and `m1-data-foundation` | `b796cb4`, recording the M1 publication from the owner's Windows environment |
+| Remote default and `m1-data-foundation` | `55ec08c`, including merged M3 and M4 |
 | `m2-dashboard` | `be8a16e`, eight commits after the shared base `950e869`. Adds metrics, API, SPA and CI coverage |
 | Audit | `audit/lead-engineering-2026-11-25`, based on M2. The M1-only publication note was reconciled here |
 | Reliability | `fix/m2-dashboard-reliability`, based on the audit branch |
 | Demo workflow | `feat/m2-demo-workflow`, based on the reliability branch |
 | M3 offline analytics | `feat/m3-offline-analytics`, based on the demo branch |
 | M4 offline documents | `feat/m4-offline-documents`, based on the green M3 branch |
+| M5 pilot authorization | `feat/m5-pilot-authorization`, based on the merged M4 baseline |
 
 Remote branch discovery returned those two branches and no `main` branch. The selected starting
 checkout was local `work` at the M1 tip. Phase 1 was approved on 24 November. The architecture,

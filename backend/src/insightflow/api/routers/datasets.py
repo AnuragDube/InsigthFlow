@@ -7,7 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Response, UploadF
 from sqlalchemy.engine import Engine
 
 from insightflow.api.background import run_in_background
-from insightflow.api.deps import get_engine, get_org_context, get_settings_dep
+from insightflow.api.deps import get_editor_context, get_engine, get_org_context, get_settings_dep
 from insightflow.api.schemas import (
     DatasetCreate,
     DatasetOut,
@@ -29,6 +29,7 @@ from insightflow.pipeline.service import request_run
 router = APIRouter(prefix="/api/v1/datasets", tags=["datasets"])
 
 Ctx = Annotated[OrgContext, Depends(get_org_context)]
+EditorCtx = Annotated[OrgContext, Depends(get_editor_context)]
 Eng = Annotated[Engine, Depends(get_engine)]
 Cfg = Annotated[Settings, Depends(get_settings_dep)]
 
@@ -59,7 +60,7 @@ def list_datasets(ctx: Ctx, engine: Eng) -> Page[DatasetOut]:
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-def create_dataset(body: DatasetCreate, ctx: Ctx, engine: Eng) -> DatasetOut:
+def create_dataset(body: DatasetCreate, ctx: EditorCtx, engine: Eng) -> DatasetOut:
     with session_scope(engine) as s:
         ds = DataSourceRepo(s).create(ctx, name=body.name, domain=body.domain, kind="file_upload")
         AuditRepo(s).record(ctx, action="dataset.create", target_type="dataset", target_id=ds.id)
@@ -80,7 +81,7 @@ def upload(
     file: Annotated[UploadFile, File()],
     response: Response,
     tasks: BackgroundTasks,
-    ctx: Ctx,
+    ctx: EditorCtx,
     engine: Eng,
     settings: Cfg,
 ) -> UploadOut:
@@ -95,8 +96,10 @@ def upload(
 
 @router.post("/{dataset_id}/load-sample", status_code=status.HTTP_202_ACCEPTED)
 def load_sample(
-    dataset_id: uuid.UUID, tasks: BackgroundTasks, ctx: Ctx, engine: Eng, settings: Cfg
+    dataset_id: uuid.UUID, tasks: BackgroundTasks, ctx: EditorCtx, engine: Eng, settings: Cfg
 ) -> RunRequestOut:
+    with session_scope(engine) as session:
+        DataSourceRepo(session).get(ctx, dataset_id)
     files = sorted(settings.sample_dir.glob("*.csv")) if settings.sample_dir.is_dir() else []
     if not files:
         raise SampleDataMissing(
@@ -115,7 +118,7 @@ def change_ingestion(
     ingestion_id: uuid.UUID,
     body: IngestionPatch,
     tasks: BackgroundTasks,
-    ctx: Ctx,
+    ctx: EditorCtx,
     engine: Eng,
     settings: Cfg,
 ) -> IngestionChangeOut:
@@ -136,6 +139,6 @@ def change_ingestion(
 
 @router.post("/{dataset_id}/pipeline-runs", status_code=status.HTTP_202_ACCEPTED)
 def trigger_run(
-    dataset_id: uuid.UUID, tasks: BackgroundTasks, ctx: Ctx, engine: Eng, settings: Cfg
+    dataset_id: uuid.UUID, tasks: BackgroundTasks, ctx: EditorCtx, engine: Eng, settings: Cfg
 ) -> RunRequestOut:
     return _queue(ctx, engine, settings, tasks, dataset_id, "manual")

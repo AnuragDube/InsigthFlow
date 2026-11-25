@@ -15,6 +15,7 @@ from insightflow.analytics.question_provider import QuestionProvider
 from insightflow.api import middleware
 from insightflow.api.background import run_in_background
 from insightflow.api.body_limit import BodySizeLimitMiddleware
+from insightflow.api.deps import PrincipalResolver
 from insightflow.api.routers import analytics, datasets, documents, health, runs
 from insightflow.api.spa import SecurityHeadersMiddleware, mount_spa
 from insightflow.core.logging import configure_logging
@@ -47,7 +48,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 def create_app(
-    settings: Settings | None = None, *, question_provider: QuestionProvider | None = None
+    settings: Settings | None = None,
+    *,
+    question_provider: QuestionProvider | None = None,
+    principal_resolver: PrincipalResolver | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     if settings.environment != "test":
@@ -61,6 +65,7 @@ def create_app(
     )
     app.state.settings = settings
     app.state.question_provider = question_provider
+    app.state.principal_resolver = principal_resolver
     app.state.engine = make_engine(settings.database_url)
     middleware.install(app)
     app.add_middleware(

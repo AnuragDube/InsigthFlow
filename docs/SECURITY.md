@@ -4,6 +4,13 @@ Status: Draft for approval (Phase 1) · Last updated: 2026-11-24
 
 ## 1. Security posture by phase (be honest about it)
 
+The M5 branch introduces an injectable principal resolver and server-side role checks. With a
+resolver, missing identities receive 401 and inactive or unknown organizations receive 403.
+Foreign resources remain unavailable to otherwise authorized callers. Without a resolver the
+local demo uses its configured demo organization. The resolver contract presumes a trusted
+server-side identity integration. Never implement it by accepting organization IDs or roles
+asserted directly by the client.
+
 | Phase | Posture | Allowed exposure |
 |---|---|---|
 | P0 (interview MVP) | No authentication. Single configured demo org. All other controls below that don't depend on identity are implemented, including localhost hardening (§1a). | **Localhost only** (binds `127.0.0.1`). Optional public demo only in `PUBLIC_DEMO_MODE=read_only`: uploads, document upload and pipeline triggers disabled; bundled data only; NL/RAG rate-limited. |
