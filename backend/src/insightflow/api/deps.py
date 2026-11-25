@@ -45,7 +45,10 @@ def get_question_provider(request: Request) -> QuestionProvider | None:
 
 def get_principal(request: Request, engine: Annotated[Engine, Depends(get_engine)]) -> Principal:
     resolver: IdentityResolver | None = request.app.state.identity_resolver
-    cookie_mode = request.app.state.session_login_resolver is not None
+    cookie_mode = (
+        request.app.state.session_login_resolver is not None
+        or request.app.state.authorization_code_flow is not None
+    )
     if resolver is None and not cookie_mode:
         ctx: OrgContext = request.app.state.demo_ctx
         return Principal(ctx.org_id, "owner")

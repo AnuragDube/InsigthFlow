@@ -47,6 +47,21 @@ type, and a maximum one-hour token lifetime. Verification uses a pinned public k
 configuration, key rotation procedures, and the browser's interactive OAuth flow must be
 validated before activating the pilot. Application logout revokes the app session.
 
+For interactive sign-in, inject an `AuthorizationCodeFlow` via `create_app`'s
+`authorization_code_flow` argument. Supply the provider's trusted HTTPS authorization
+and token endpoints, client ID and scopes, an `AccessTokenResolver`, and the exact
+`https://<pilot-host>/api/v1/session/callback` registered with the provider. Use a public
+OAuth client that supports authorization code with S256 PKCE and RFC 9068 access tokens
+for the configured API audience. The application keeps the verifier and one-use state on
+the server for five minutes. The callback binds state to a secure browser cookie, verifies
+the access token, and checks membership before issuing the app session.
+
+The pending sign-in store is bounded and process-local. Run the pilot as one process
+and omit callback query strings from application and reverse-proxy access logs.
+An interrupted sign-in can be restarted. The browser never receives provider tokens in
+the app response. Keep the sign-in integration disabled until the selected provider, redirect
+configuration, and key management have been verified in the pilot environment.
+
 | Phase | Posture | Allowed exposure |
 |---|---|---|
 | P0 (interview MVP) | No authentication. Single configured demo org. All other controls below that don't depend on identity are implemented, including localhost hardening (§1a). | **Localhost only** (binds `127.0.0.1`). Optional public demo only in `PUBLIC_DEMO_MODE=read_only`: uploads, document upload and pipeline triggers disabled; bundled data only; NL/RAG rate-limited. |

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { api } from "./api/client";
+import { ApiError, api } from "./api/client";
 import type { Dataset, Page } from "./api/types";
 import { Data } from "./pages/Data";
 import { Documents } from "./pages/Documents";
@@ -60,7 +60,19 @@ function Welcome({ onReady }: { onReady: (id: string, tab: Tab) => void }) {
 
 export function App() {
   const qc = useQueryClient();
-  const datasets = useQuery({ queryKey: ["datasets"], queryFn: api.datasets });
+  const datasets = useQuery({
+    queryKey: ["datasets"],
+    queryFn: api.datasets,
+    retry: (count, error) =>
+      count < 3 && !(error instanceof ApiError && [401, 403].includes(error.status)),
+  });
+  const session = useQuery({ queryKey: ["session-options"], queryFn: api.sessionOptions });
+  const signOut = useMutation({
+    mutationFn: api.signOut,
+    onSuccess: () => window.location.assign("/"),
+  });
+  const signInRequired =
+    session.data?.interactive && datasets.error instanceof ApiError && datasets.error.status === 401;
   const [tab, setTab] = useState<Tab>(tabFromHash);
   const [chosen, setChosen] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -89,6 +101,32 @@ export function App() {
 
   const items = datasets.data?.items ?? [];
   const current = items.find((d) => d.id === chosen) ?? pickDefault(items);
+
+  if (signInRequired) {
+    return (
+      <main className="shell">
+        <h1 className="summary">Sign in to InsightFlow.</h1>
+        <form className="toolbar" onSubmit={(event) => {
+          event.preventDefault();
+          const workspace = String(new FormData(event.currentTarget).get("workspace") ?? "");
+          const params = new URLSearchParams({ workspace });
+          window.location.assign(`/api/v1/session/login?${params}`);
+        }}>
+          <label className="field question-field">
+            Workspace ID
+            <input
+              type="text"
+              name="workspace"
+              required
+              pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+              maxLength={36}
+            />
+          </label>
+          <button className="btn" type="submit">Continue to sign in</button>
+        </form>
+      </main>
+    );
+  }
 
   return (
     <div className="shell">
@@ -130,8 +168,14 @@ export function App() {
                 </select>
               </label>
         )}
+        {session.data?.interactive && datasets.isSuccess && (
+          <button className="btn quiet" type="button" disabled={signOut.isPending} onClick={() => signOut.mutate()}>
+            Sign out
+          </button>
+        )}
       </header>
       <main>
+        {signOut.error && <p className="notice error" role="alert">{signOut.error.message}</p>}
         {datasets.error && <p className="notice error">Can’t reach the API: {datasets.error.message}</p>}
         {datasets.isLoading && <p className="hint">Loading…</p>}
         {datasets.data && !current && tab !== "documents" && (

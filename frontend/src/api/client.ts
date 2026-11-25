@@ -42,6 +42,8 @@ const json = (body: unknown): RequestInit => ({
 });
 
 export const api = {
+  sessionOptions: () => request<{ interactive: boolean }>("/session"),
+  signOut: () => request<void>("/session", { method: "DELETE" }),
   datasets: () => request<Page<Dataset>>("/datasets"),
   createDataset: (name: string) => request<Dataset>("/datasets", json({ name })),
   ask: (id: string, question: string, from?: string, to?: string) =>
