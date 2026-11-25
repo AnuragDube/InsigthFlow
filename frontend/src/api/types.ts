@@ -96,3 +96,16 @@ export interface Dashboard {
     quality: { passed: number; warnings: number; failed: number };
   };
 }
+
+export interface MetricAnswer {
+  metric: string;
+  label: string;
+  description: string;
+  unit: Unit;
+  value: number | null;
+  from: string;
+  to: string;
+  run_id: string;
+  sql: string[];
+  parameters: { start: string; end: string };
+}

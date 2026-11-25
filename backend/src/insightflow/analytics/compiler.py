@@ -44,8 +44,11 @@ def _range_filter(metric: Metric) -> str:
     return f" WHERE t.{col} >= $start AND t.{col} < $end" if col else ""
 
 
-def _scalar(con: duckdb.DuckDBPyConnection, metric: Metric, start: date, end: date) -> Value:
-    sql = f"SELECT {metric.expression} FROM {_from_clause(metric)}{_range_filter(metric)}"
+def _scalar_sql(metric: Metric) -> str:
+    return f"SELECT {metric.expression} FROM {_from_clause(metric)}{_range_filter(metric)}"
+
+
+def _scalar(con: duckdb.DuckDBPyConnection, sql: str, start: date, end: date) -> Value:
     row = con.execute(sql, _params(start, end)).fetchone()
     value: Value = row[0] if row else None
     return value
@@ -67,12 +70,34 @@ def compute_kpis(
     values: dict[str, Value] = {}
     for name, metric in metrics.items():  # registry order: operands precede formulas
         if metric.kind == "aggregate":
-            values[name] = _scalar(con, metric, start, end)
+            values[name] = _scalar(con, _scalar_sql(metric), start, end)
         else:
             a, b = (values[o] for o in metric.operands)
             assert metric.op is not None
             values[name] = _combine(metric.op, a, b)
     return values
+
+
+def compute_metric_with_sql(
+    con: duckdb.DuckDBPyConnection,
+    metrics: dict[str, Metric],
+    name: str,
+    start: date,
+    end: date,
+) -> tuple[Value, list[str]]:
+    """Evaluate only the chosen metric and its operands, recording the SQL used."""
+    statements: list[str] = []
+
+    def evaluate(metric: Metric) -> Value:
+        if metric.kind == "aggregate":
+            sql = _scalar_sql(metric)
+            statements.append(sql)
+            return _scalar(con, sql, start, end)
+        left, right = metric.operands
+        assert metric.op is not None
+        return _combine(metric.op, evaluate(metrics[left]), evaluate(metrics[right]))
+
+    return evaluate(metrics[name]), statements
 
 
 def compute_series(

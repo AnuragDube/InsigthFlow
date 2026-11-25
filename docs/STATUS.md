@@ -6,6 +6,11 @@ Updated 25 November 2026 (IST). Interview on Friday, 27 November 2026.
 workflow passed Linux validation. The November 27 priority is a rehearsal on Windows 11. Keep the
 current application local and use public or synthetic demo data.
 
+**M3 offline foundation is implemented.** The Ask tab maps supported questions and metric names
+to the existing registry. It shows the value, applied date range, published run, parameterized SQL,
+and metric definition. Unsupported questions are declined. Date filters belong in the separate
+date inputs. Hosted model integration and arbitrary natural-language interpretation remain open.
+
 ## Branch and design review
 
 | Ref | Evidence |
@@ -15,6 +20,7 @@ current application local and use public or synthetic demo data.
 | Audit | `audit/lead-engineering-2026-11-25`, based on M2. The M1-only publication note was reconciled here |
 | Reliability | `fix/m2-dashboard-reliability`, based on the audit branch |
 | Demo workflow | `feat/m2-demo-workflow`, based on the reliability branch |
+| M3 offline analytics | `feat/m3-offline-analytics`, based on the demo branch |
 
 Remote branch discovery returned those two branches and no `main` branch. The selected starting
 checkout was local `work` at the M1 tip. Phase 1 was approved on 24 November. The architecture,
@@ -62,6 +68,19 @@ published run ID.
 - Playwright with system Chromium 156.0.8078.79 passed **4 tests in 18.4 s**. Both desktop and
   phone verified the offline sample, dataset creation, rebuild, and a blocked upload leaving
   the prior publication and dashboard totals intact.
+
+### M3 offline verification
+
+- Linux Python 3.12.14. Ruff lint and format passed (74 files formatted), mypy passed
+  (55 source files), and pytest passed **129 tests in 24.04 s**.
+- Linux Node 22.23.5. TypeScript and Vite build passed with the existing chunk-size warning.
+  Vitest passed **15 tests**. Playwright passed **4 tests in 19.8 s** using system Chromium
+  156.0.8078.79. Desktop and phone checked the fixture answer, SQL evidence, and an unsupported
+  question, alongside both dashboard and quality-gate flows.
+- The question text selects a registry entry through whole-question matching. The compiler
+  binds dates on the locked read-only Gold connection. Formula metrics show the SQL for their
+  operands and the formula definition. Hosted inference, model-generated SQL, and live evaluation
+  remain outside the verified scope.
 
 ## Capability inventory
 

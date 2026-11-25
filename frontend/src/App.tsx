@@ -4,9 +4,14 @@ import { api } from "./api/client";
 import type { Dataset, Page } from "./api/types";
 import { Data } from "./pages/Data";
 import { Overview } from "./pages/Overview";
+import { Questions } from "./pages/Questions";
 
-type Tab = "overview" | "data";
-const tabFromHash = (): Tab => (window.location.hash === "#data" ? "data" : "overview");
+type Tab = "overview" | "data" | "questions";
+function tabFromHash(): Tab {
+  const hash = window.location.hash;
+  if (hash === "#data") return "data";
+  return hash === "#questions" ? "questions" : "overview";
+}
 
 function pickDefault(items: Dataset[]): Dataset | undefined {
   // Most recently published first; otherwise the newest dataset.
@@ -76,7 +81,7 @@ export function App() {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
   const go = (t: Tab) => {
-    window.location.hash = t === "data" ? "data" : "";
+    window.location.hash = t === "overview" ? "" : t;
     setTab(t);
   };
 
@@ -97,6 +102,9 @@ export function App() {
               </button>
               <button type="button" className="tab" aria-current={tab === "data" ? "page" : undefined} onClick={() => go("data")}>
                 Data
+              </button>
+              <button type="button" className="tab" aria-current={tab === "questions" ? "page" : undefined} onClick={() => go("questions")}>
+                Ask
               </button>
             </nav>
             {items.length > 1 && (
@@ -126,6 +134,7 @@ export function App() {
           />
         )}
         {current && tab === "overview" && <Overview key={current.id} datasetId={current.id} onOpenData={() => go("data")} />}
+        {current && tab === "questions" && <Questions key={current.id} datasetId={current.id} />}
         {current && tab === "data" && (
           <>
             {creating ? (

@@ -101,6 +101,9 @@ select, input[type="date"], input[type="text"] {
 }
 .summary strong { font-weight: 700; color: var(--ledger); }
 .toolbar { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: end; margin-bottom: 1rem; }
+.question-field { flex: 1 1 100%; align-items: start; flex-direction: column; }
+.question-field input { width: min(100%, 40rem); }
+.query-sql { overflow-wrap: anywhere; white-space: pre-wrap; }
 .presets { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 .chip {
   border: 1px solid var(--rule); background: var(--surface); border-radius: 999px;

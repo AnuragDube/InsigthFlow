@@ -16,6 +16,7 @@ from insightflow.analytics.compiler import (
     Value,
     compute_breakdown,
     compute_kpis,
+    compute_metric_with_sql,
     compute_series,
 )
 from insightflow.analytics.registry import Metric, load_metrics
@@ -28,6 +29,21 @@ from insightflow.warehouse.engine import open_gold, open_gold_run
 
 DAILY_TREND_MAX_DAYS = 62
 MAX_ANALYTICS_DAYS = 3660
+
+# Whole-question aliases only. Additional clauses must not be silently ignored.
+QUESTION_ALIASES = {
+    "how much did we sell": "gross_revenue",
+    "what was our gross revenue": "gross_revenue",
+    "how many orders did we have": "orders",
+    "how many units did we sell": "units_sold",
+    "what was our net revenue": "net_revenue",
+    "what was the average order value": "average_order_value",
+    "how many active customers did we have": "active_customers",
+    "how many new customers did we have": "new_customers",
+    "what was the repeat customer rate": "repeat_customer_rate",
+    "what was the return rate by value": "return_rate_value",
+    "what was the value of returns": "returns_value",
+}
 
 
 def as_number(v: Value) -> float | int | None:
@@ -92,6 +108,47 @@ def _change(value: Value, previous: Value) -> float | None:
     if v is None or p is None or p == 0:
         return None
     return (v - p) / abs(p)
+
+
+def answer_question(
+    ctx: OrgContext,
+    engine: Engine,
+    settings: Settings,
+    source_id: uuid.UUID,
+    question: str,
+    start: date | None,
+    end: date | None,
+) -> dict[str, object]:
+    with session_scope(engine) as session:
+        source = DataSourceRepo(session).get(ctx, source_id)
+        domain, run_id = source.domain, source.published_run_id
+    metrics = load_metrics(domain)
+    normalized = " ".join(question.casefold().split()).removesuffix("?").rstrip()
+    labels = {metric.label.casefold(): metric.name for metric in metrics.values()}
+    name = QUESTION_ALIASES.get(normalized) or labels.get(normalized)
+    if name is None or name not in metrics:
+        raise ValidationFailed(
+            "This question is outside the supported set. Try a suggested question or metric name."
+        )
+    metric = metrics[name]
+    con = open_gold_run(ctx, settings, source_id, run_id)
+    try:
+        rng = _resolve(con, start, end)
+        value, statements = compute_metric_with_sql(con, metrics, name, rng.start, rng.end)
+    finally:
+        con.close()
+    return {
+        "metric": name,
+        "label": metric.label,
+        "description": metric.description,
+        "unit": metric.unit,
+        "value": as_number(value),
+        "from": rng.start,
+        "to": rng.end,
+        "run_id": run_id,
+        "sql": statements,
+        "parameters": {"start": rng.start, "end": rng.end + timedelta(days=1)},
+    }
 
 
 def dashboard(

@@ -23,6 +23,18 @@ test("first run: load sample data, watch it publish, read the dashboard", async 
   await expect(page.getByRole("heading", { level: 1 })).toContainText("£75.75 gross revenue from 4 orders");
   await expect(page.getByText("quality checks passed")).toBeVisible();
   await page.screenshot({ path: `test-results/overview-${info.project.name}.png`, fullPage: true });
+
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  await page.getByRole("button", { name: "How much did we sell?" }).click();
+  await page.getByRole("button", { name: "Ask question" }).click();
+  await expect(page.getByRole("heading", { name: "Gross revenue: £75.75" })).toBeVisible();
+  await page.getByText("Query and published run").click();
+  await expect(page.locator("pre")).toContainText("SELECT sum(revenue)");
+  await page.screenshot({ path: `test-results/questions-${info.project.name}.png`, fullPage: true });
+
+  await page.getByRole("textbox", { name: "Question" }).fill("How much did we sell in France?");
+  await page.getByRole("button", { name: "Ask question" }).click();
+  await expect(page.getByRole("alert")).toContainText("outside the supported set");
 });
 
 test("a blocked upload preserves the last published dashboard", async ({ page }, info) => {

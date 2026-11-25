@@ -5,6 +5,7 @@ from datetime import date
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.engine import Engine
 
 from insightflow.analytics import service
@@ -20,6 +21,21 @@ Eng = Annotated[Engine, Depends(get_engine)]
 Cfg = Annotated[Settings, Depends(get_settings_dep)]
 From = Annotated[date | None, Query(alias="from")]
 To = Annotated[date | None, Query(alias="to")]
+
+
+class QuestionRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=240)
+    from_date: date | None = Field(default=None, alias="from")
+    to_date: date | None = Field(default=None, alias="to")
+
+
+@router.post("/datasets/{dataset_id}/questions")
+def ask_question(
+    dataset_id: uuid.UUID, body: QuestionRequest, ctx: Ctx, engine: Eng, settings: Cfg
+) -> dict[str, Any]:
+    return service.answer_question(
+        ctx, engine, settings, dataset_id, body.question, body.from_date, body.to_date
+    )
 
 
 @router.get("/metrics")

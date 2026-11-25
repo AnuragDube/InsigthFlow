@@ -1,4 +1,4 @@
-import type { Dashboard, Dataset, Ingestion, Page, QualityResult, Run, RunRequest, Upload } from "./types";
+import type { Dashboard, Dataset, Ingestion, MetricAnswer, Page, QualityResult, Run, RunRequest, Upload } from "./types";
 
 /** Error carrying the server's RFC 9457 problem details. */
 export class ApiError extends Error {
@@ -44,6 +44,8 @@ const json = (body: unknown): RequestInit => ({
 export const api = {
   datasets: () => request<Page<Dataset>>("/datasets"),
   createDataset: (name: string) => request<Dataset>("/datasets", json({ name })),
+  ask: (id: string, question: string, from?: string, to?: string) =>
+    request<MetricAnswer>(`/datasets/${id}/questions`, json({ question, from, to })),
   ingestions: (id: string) => request<Page<Ingestion>>(`/datasets/${id}/ingestions`),
   upload: (id: string, file: File) => {
     const form = new FormData();

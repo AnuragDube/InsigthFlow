@@ -57,8 +57,10 @@ M1 and M2 already exist. Rehearse the local M2 dashboard on Windows 11 with a fi
 then sign off the dashboard reliability work. Defer live model integration, RAG, and public
 deployment until after the interview. The phase plan below records the original scope.
 
-After sign-off, sequence private-pilot identity and isolation work alongside an offline evaluation
-of natural-language questions against deterministic metrics. Plan grounded document retrieval next
+The M3 offline Ask tab evaluates supported questions against deterministic metrics. Next, expand
+offline evaluation and introduce a provider that can select only a validated metric and scope.
+Live-provider evaluation requires approved access and data-handling terms. Sequence private-pilot
+identity and isolation before customer data. Plan grounded document retrieval next
 if discovery shows demand. Introduce scikit-learn models only with a business baseline and
 time-based evaluations. Treat PySpark/Databricks parity as optional and require demonstrated value
 before adding infrastructure or new operating costs.

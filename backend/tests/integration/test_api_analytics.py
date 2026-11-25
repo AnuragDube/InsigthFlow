@@ -191,3 +191,55 @@ def test_no_published_data_is_409(client: TestClient) -> None:
 def test_unknown_dataset_is_404(client: TestClient) -> None:
     r = client.get(f"/api/v1/datasets/{uuid.uuid4()}/dashboard")
     assert r.status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("question", "metric", "value", "statements"),
+    [
+        ("  HOW  MUCH did we sell? ", "gross_revenue", 140.445, 1),
+        ("How many orders did we have?", "orders", 7, 1),
+        ("What was our net revenue?", "net_revenue", 133.495, 2),
+        ("Repeat customer rate", "repeat_customer_rate", 0.25, 1),
+    ],
+)
+def test_question_answers_use_published_metrics(
+    client: TestClient, ds: uuid.UUID, question: str, metric: str, value: float, statements: int
+) -> None:
+    base = f"/api/v1/datasets/{ds}"
+    response = client.post(f"{base}/questions", json={"question": question}, headers=H)
+    assert response.status_code == 200
+    answer = response.json()
+    assert answer["metric"] == metric
+    assert answer["value"] == pytest.approx(value)
+    assert answer["parameters"] == {"start": "2010-12-01", "end": "2010-12-07"}
+    assert len(answer["sql"]) == statements
+    assert all("$start" in sql and "$end" in sql for sql in answer["sql"])
+    assert answer["run_id"] == client.get(f"{base}/dashboard").json()["freshness"]["run_id"]
+
+
+def test_questions_respect_date_bounds_and_decline_unsupported_requests(
+    client: TestClient, ds: uuid.UUID
+) -> None:
+    path = f"/api/v1/datasets/{ds}/questions"
+    gross = {"question": "Gross revenue", "from": "2010-12-04", "to": "2010-12-06"}
+    answer = client.post(path, json=gross, headers=H)
+    assert answer.status_code == 200
+    assert answer.json()["value"] == pytest.approx(50.805)
+    for body in (
+        {"question": "How much did we sell in France?"},
+        {"question": "Forecast next month's sales"},
+        {"question": "x" * 241},
+        {**gross, "to": "2009-12-06"},
+    ):
+        declined = client.post(path, json=body, headers=H)
+        assert declined.status_code == 422
+        assert "sql" not in declined.json()
+
+
+def test_questions_require_a_published_dataset(client: TestClient) -> None:
+    empty = client.post("/api/v1/datasets", json={"name": "Empty"}, headers=H).json()
+    for dataset, expected in ((empty["id"], 409), (uuid.uuid4(), 404)):
+        response = client.post(
+            f"/api/v1/datasets/{dataset}/questions", json={"question": "Orders"}, headers=H
+        )
+        assert response.status_code == expected
