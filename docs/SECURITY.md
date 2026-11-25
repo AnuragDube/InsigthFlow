@@ -23,6 +23,18 @@ uv run --frozen python scripts/manage_workspace.py revoke pilot example-issuer e
 Granting a new role replaces the previous role. Revocation applies to subsequent requests,
 including requests from a still-valid identity session.
 
+An HTTPS deployment may inject a trusted `session_login_resolver` into `create_app`. It is
+mutually exclusive with direct `identity_resolver` mode. `POST /api/v1/session` exchanges a
+verified identity with an active membership for an eight-hour browser session. The cookie is
+host-only, Secure, HttpOnly, and SameSite=Strict. A successful exchange replaces the caller's
+prior session. `DELETE /api/v1/session` revokes the server-side session and clears the cookie.
+Both endpoints require the existing client-header CSRF guard.
+
+Only token digests are persisted. Membership deletion cascades to the member's sessions, so a
+later regrant cannot reactivate an old session. Roles are looked up per request. The default
+local demo keeps these endpoints disabled. Live sign-in still requires a configured provider
+and validation of its identity proof.
+
 | Phase | Posture | Allowed exposure |
 |---|---|---|
 | P0 (interview MVP) | No authentication. Single configured demo org. All other controls below that don't depend on identity are implemented, including localhost hardening (§1a). | **Localhost only** (binds `127.0.0.1`). Optional public demo only in `PUBLIC_DEMO_MODE=read_only`: uploads, document upload and pipeline triggers disabled; bundled data only; NL/RAG rate-limited. |

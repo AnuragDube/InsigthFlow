@@ -23,5 +23,6 @@ def test_migrations_create_schema_matching_models(tmp_path: Path) -> None:
         "audit_events",
         "documents",
         "workspace_memberships",
+        "browser_sessions",
     } <= tables
     assert pending_model_changes(url) == []

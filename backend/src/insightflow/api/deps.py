@@ -14,6 +14,7 @@ from insightflow.analytics.question_provider import QuestionProvider
 from insightflow.core.context import OrgContext, Role, VerifiedIdentity
 from insightflow.core.errors import AuthenticationRequired, ForbiddenError
 from insightflow.core.settings import Settings
+from insightflow.metadata.browser_sessions import COOKIE_NAME, resolve_session
 from insightflow.metadata.db import session_scope
 from insightflow.metadata.memberships import role_for
 
@@ -44,13 +45,16 @@ def get_question_provider(request: Request) -> QuestionProvider | None:
 
 def get_principal(request: Request, engine: Annotated[Engine, Depends(get_engine)]) -> Principal:
     resolver: IdentityResolver | None = request.app.state.identity_resolver
-    if resolver is None:
+    cookie_mode = request.app.state.session_login_resolver is not None
+    if resolver is None and not cookie_mode:
         ctx: OrgContext = request.app.state.demo_ctx
         return Principal(ctx.org_id, "owner")
-    identity = resolver(request)
-    if identity is None:
-        raise AuthenticationRequired("Sign in to access this workspace.")
+    identity = resolver(request) if resolver is not None else None
     with session_scope(engine) as session:
+        if cookie_mode:
+            identity = resolve_session(session, request.cookies.get(COOKIE_NAME, ""))
+        if identity is None:
+            raise AuthenticationRequired("Sign in to access this workspace.")
         role = role_for(session, identity)
     if role is None:
         raise ForbiddenError("You do not have access to this workspace.")

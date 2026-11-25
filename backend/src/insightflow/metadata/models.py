@@ -277,3 +277,26 @@ class WorkspaceMembership(Base):
     __table_args__ = (
         CheckConstraint("role IN ('owner','editor','viewer')", name="ck_workspace_membership_role"),
     )
+
+
+class BrowserSession(Base):
+    __tablename__ = "browser_sessions"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    org_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    issuer: Mapped[str] = mapped_column(String(255))
+    subject: Mapped[str] = mapped_column(String(255))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["org_id", "issuer", "subject"],
+            [
+                "workspace_memberships.org_id",
+                "workspace_memberships.issuer",
+                "workspace_memberships.subject",
+            ],
+            name="fk_browser_session_membership",
+            ondelete="CASCADE",
+        ),
+        Index("ix_browser_session_expiry", "expires_at"),
+        Index("ix_browser_session_membership", "org_id", "issuer", "subject"),
+    )
