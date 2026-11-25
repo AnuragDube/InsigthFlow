@@ -78,8 +78,9 @@ published run ID.
   evaluation must be resolved before activation.
 - Latest local checks passed: **143 backend tests in 25.89 s**, Ruff lint and format (77 files),
   mypy (57 source files), and **4 browser tests in 20.9 s** using Node 22 and system Chromium.
-  GitHub Actions run 45562356067 reported a failure in Windows pytest. Its detailed log requires
-  a signed-in GitHub session, so the underlying failure is pending diagnosis.
+  GitHub Actions run 45562356067 reported a Windows-only JavaScript MIME mismatch in pytest
+  (135 passed, 1 failed). The SPA now explicitly serves JavaScript as `text/javascript`.
+  The local regression test simulates the Windows MIME mapping. Hosted Windows sign-off is pending.
 
 - The validated provider interface is now in place. A provider receives metric descriptions and
   question text and can return a registered metric identifier. Dates are interpreted and

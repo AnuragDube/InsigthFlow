@@ -53,7 +53,9 @@ def mount_spa(app: FastAPI, dist: Path) -> None:
             raise NotFoundError("Not found.")  # unknown API routes stay JSON problems
         candidate = (root / path).resolve()
         if path and candidate.is_file() and candidate.is_relative_to(root):
-            return FileResponse(candidate)
+            # Windows MIME registration can differ from the standard JavaScript media type.
+            media_type = "text/javascript" if candidate.suffix.lower() in {".js", ".mjs"} else None
+            return FileResponse(candidate, media_type=media_type)
         if not index.is_file():
             raise NotFoundError("Not found.")
         return FileResponse(index, headers={"Cache-Control": "no-cache"})

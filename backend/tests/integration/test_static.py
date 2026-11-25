@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from mimetypes import guess_type
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from insightflow.api.app import create_app
@@ -16,7 +18,15 @@ def _dist(tmp_path: Path) -> Path:
     return dist
 
 
-def test_serves_spa_and_assets(settings: Settings, tmp_path: Path) -> None:
+def test_serves_spa_and_assets(
+    settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def windows_mime(path: str | Path) -> tuple[str | None, str | None]:
+        if Path(path).suffix == ".js":
+            return "application/javascript", None
+        return guess_type(path)
+
+    monkeypatch.setattr("starlette.responses.guess_type", windows_mime)
     s = settings.model_copy(update={"frontend_dist": _dist(tmp_path)})
     with TestClient(create_app(s)) as c:
         assert "InsightFlow" in c.get("/").text
