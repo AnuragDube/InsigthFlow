@@ -9,14 +9,18 @@ test("an interactive pilot shows the workspace sign-in form", async ({ page }) =
       json: { type: "/errors/authentication-required", detail: "Sign in to access this workspace." },
     }),
   );
-  await page.route((url) => url.pathname === "/api/v1/session/login", (route) => route.fulfill({
-    body: "Identity provider handoff",
-  }));
+  await page.route((url) => url.pathname === "/api/v1/session/login", (route) => {
+    expect(new URL(route.request().url()).searchParams.get("workspace")).toBe(workspace);
+    return route.fulfill({ status: 303, headers: { location: "https://identity.example/authorize" } });
+  });
+  await page.route("https://identity.example/authorize", (route) =>
+    route.fulfill({ contentType: "text/html", body: "<h1>Identity provider handoff</h1>" }),
+  );
 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Sign in to InsightFlow." })).toBeVisible();
   await page.getByRole("textbox", { name: "Workspace ID" }).fill(workspace);
   await page.getByRole("button", { name: "Continue to sign in" }).click();
-  await expect(page).toHaveURL(`/api/v1/session/login?workspace=${workspace}`);
+  await expect(page).toHaveURL("https://identity.example/authorize");
   await expect(page.getByText("Identity provider handoff")).toBeVisible();
 });

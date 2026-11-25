@@ -106,7 +106,12 @@ export function App() {
     return (
       <main className="shell">
         <h1 className="summary">Sign in to InsightFlow.</h1>
-        <form className="toolbar" action="/api/v1/session/login" method="get">
+        <form className="toolbar" onSubmit={(event) => {
+          event.preventDefault();
+          const workspace = String(new FormData(event.currentTarget).get("workspace") ?? "");
+          const params = new URLSearchParams({ workspace });
+          window.location.assign(`/api/v1/session/login?${params}`);
+        }}>
           <label className="field question-field">
             Workspace ID
             <input
