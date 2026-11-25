@@ -12,6 +12,10 @@ and metric definition. Unsupported questions are declined. Use the date fields o
 range in the question. An opt-in Groq adapter passed mocked HTTP integration tests. Live provider
 activation and broader natural-language interpretation remain open.
 
+**M4 offline document search is implemented.** The Documents tab accepts UTF-8 TXT and Markdown,
+returns matching excerpts with source line numbers, and supports removal. It runs locally with BM25
+and returns an empty result when lexical evidence is insufficient.
+
 ## Branch and design review
 
 | Ref | Evidence |
@@ -22,6 +26,7 @@ activation and broader natural-language interpretation remain open.
 | Reliability | `fix/m2-dashboard-reliability`, based on the audit branch |
 | Demo workflow | `feat/m2-demo-workflow`, based on the reliability branch |
 | M3 offline analytics | `feat/m3-offline-analytics`, based on the demo branch |
+| M4 offline documents | `feat/m4-offline-documents`, based on the green M3 branch |
 
 Remote branch discovery returned those two branches and no `main` branch. The selected starting
 checkout was local `work` at the M1 tip. Phase 1 was approved on 24 November. The architecture,
@@ -102,6 +107,20 @@ published run ID.
   binds dates on the locked read-only Gold connection. Formula metrics show the SQL for their
   operands and the formula definition. Hosted inference, model-generated SQL, and live evaluation
   remain outside the verified scope.
+
+### M4 offline document search
+
+- Documents live in SQLite under an organization-scoped key. List, search, and removal use that
+  organization scope. Uploads are limited to 64 KiB and each organization can hold 20 documents.
+- Search chunks only the caller's documents and builds an in-memory index for the bounded corpus.
+  It returns up to five literal excerpts with one-based line references. Retrieval uses lexical
+  overlap and BM25 scoring. A larger evaluation set is still needed to measure relevance.
+- Current scope is local demo data, under the same demo-organization context as analytics.
+  Hosted answer generation, document ACLs, and durable index versions remain future work.
+- Verified on Linux with Python 3.12.14 and Node 22.23.5. Pytest passed **151 tests in 25.11 s**.
+  Vitest passed **15 tests**, and Playwright passed **6 tests in 20.0 s** on installed Chromium,
+  including document upload, citation, and removal on desktop and phone. Lint, formatting,
+  mypy, TypeScript, and the production build passed.
 
 ## Capability inventory
 

@@ -109,3 +109,16 @@ export interface MetricAnswer {
   sql: string[];
   parameters: { start: string; end: string };
 }
+
+export interface SearchDocument {
+  id: string;
+  title: string;
+}
+
+export interface DocumentCitation {
+  document_id: string;
+  title: string;
+  start_line: number;
+  end_line: number;
+  excerpt: string;
+}

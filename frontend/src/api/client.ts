@@ -1,4 +1,4 @@
-import type { Dashboard, Dataset, Ingestion, MetricAnswer, Page, QualityResult, Run, RunRequest, Upload } from "./types";
+import type { Dashboard, Dataset, DocumentCitation, Ingestion, MetricAnswer, Page, QualityResult, Run, RunRequest, SearchDocument, Upload } from "./types";
 
 /** Error carrying the server's RFC 9457 problem details. */
 export class ApiError extends Error {
@@ -32,7 +32,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     }
     throw new ApiError(res.status, type, detail);
   }
-  return (await res.json()) as T;
+  return (res.status === 204 ? undefined : await res.json()) as T;
 }
 
 const json = (body: unknown): RequestInit => ({
@@ -46,6 +46,15 @@ export const api = {
   createDataset: (name: string) => request<Dataset>("/datasets", json({ name })),
   ask: (id: string, question: string, from?: string, to?: string) =>
     request<MetricAnswer>(`/datasets/${id}/questions`, json({ question, from, to })),
+  documents: () => request<SearchDocument[]>("/documents"),
+  uploadDocument: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<SearchDocument>("/documents", { method: "POST", body: form });
+  },
+  deleteDocument: (id: string) => request<void>(`/documents/${id}`, { method: "DELETE" }),
+  searchDocuments: (question: string) =>
+    request<DocumentCitation[]>("/documents/search", json({ question })),
   ingestions: (id: string) => request<Page<Ingestion>>(`/datasets/${id}/ingestions`),
   upload: (id: string, file: File) => {
     const form = new FormData();

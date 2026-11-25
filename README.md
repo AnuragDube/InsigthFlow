@@ -30,6 +30,8 @@ Use **Data → New dataset** to keep later uploads separate from the sample dash
 offline rehearsal with deterministic results, see [the fixture walkthrough](docs/STATUS.md#offline-rehearsal-setup).
 Use **Ask** for supported questions such as “How much did we sell?” or a dashboard metric name.
 Each answer includes its applied dates, published run, and parameterized SQL. This works offline.
+Use **Documents** to upload small UTF-8 text or Markdown files and search for excerpts with
+source line numbers. Document search also works offline.
 
 For frontend development with hot reload, run the API as above and `npm run dev` in `frontend/`
 (http://localhost:5173, proxies `/api`). End-to-end tests: `npm run e2e` in `frontend/`.

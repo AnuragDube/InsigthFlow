@@ -15,10 +15,11 @@ from insightflow.analytics.question_provider import QuestionProvider
 from insightflow.api import middleware
 from insightflow.api.background import run_in_background
 from insightflow.api.body_limit import BodySizeLimitMiddleware
-from insightflow.api.routers import analytics, datasets, health, runs
+from insightflow.api.routers import analytics, datasets, documents, health, runs
 from insightflow.api.spa import SecurityHeadersMiddleware, mount_spa
 from insightflow.core.logging import configure_logging
 from insightflow.core.settings import Settings, get_settings
+from insightflow.documents.service import MAX_DOCUMENT_BYTES
 from insightflow.metadata.bootstrap import ensure_demo_org
 from insightflow.metadata.db import make_engine, session_scope
 from insightflow.metadata.migrate import upgrade_to_head
@@ -73,6 +74,16 @@ def create_app(
         BodySizeLimitMiddleware,
         max_bytes=settings.max_upload_mb * 1024 * 1024 + 64 * 1024,  # + multipart framing
         limit_mb=settings.max_upload_mb,
+        route_limits={
+            ("POST", "/api/v1/documents"): (
+                MAX_DOCUMENT_BYTES + 4096,
+                "Documents are limited to 64 KiB.",
+            ),
+            ("POST", "/api/v1/documents/search"): (
+                4096,
+                "The document search request is too large.",
+            ),
+        },
     )
     app.add_middleware(SecurityHeadersMiddleware)
     # Outermost: reject unexpected Host headers (defeats DNS rebinding against localhost).
@@ -81,6 +92,7 @@ def create_app(
     app.include_router(datasets.router)
     app.include_router(runs.router)
     app.include_router(analytics.router)
+    app.include_router(documents.router)
     if settings.frontend_dist is not None:
         mount_spa(app, settings.frontend_dist)  # last: catch-all for client-side routes
     return app
