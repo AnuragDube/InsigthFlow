@@ -186,6 +186,16 @@ configuration differs (verified, see `docs/spikes/`). Therefore **all readers of
 NL-to-SQL alike — use one connection factory with the identical sandboxed configuration**. Opening per
 request vs caching one connection per published run is decided by measurement in Phase 4.
 
+The dashboard resolves the published run once and uses that ID for its quality report, freshness
+metadata, and read-only Gold connection. A dataset awaiting its first publication returns
+`409 no-published-data`. A publication with a missing Gold file returns
+`503 published-data-unavailable` and can be rebuilt from its active batches.
+
+Analytics date ranges include both endpoints and may span up to 3,660 days. When both dates
+are omitted, datasets with longer histories default to their latest 3,660 days. The dashboard
+reports the original data bounds so callers can select earlier windows, and labels the capped
+default as **Latest data**.
+
 ## 5. Where Delta Lake would add measurable value (evaluation criteria)
 | Delta capability | Do we need it in P0? | Trigger to adopt |
 |---|---|---|

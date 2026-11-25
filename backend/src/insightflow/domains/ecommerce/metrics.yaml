@@ -1,0 +1,101 @@
+# Deterministic metric definitions (the single source of truth for dashboard, API and NL-to-SQL).
+# Rules shared by all metrics (DATA_ARCHITECTURE.md §3): inclusive calendar-date ranges, ratios are
+# null when the denominator is 0, customer metrics exclude the UNKNOWN member. GBP, no FX.
+sources:
+  fact_sales: {time_column: invoice_date}
+  fact_returns: {time_column: invoice_date}
+  dim_customer: {time_column: first_order_date}
+  customer_orders:   # virtual: orders per known customer inside the selected range
+    query: >-
+      SELECT customer_key, count(DISTINCT invoice_no) AS orders
+      FROM fact_sales
+      WHERE customer_key <> 'UNKNOWN' AND invoice_date >= $start AND invoice_date < $end
+      GROUP BY customer_key
+
+metrics:
+  - name: gross_revenue
+    label: Gross revenue
+    unit: GBP
+    kind: aggregate
+    source: fact_sales
+    expression: sum(revenue)
+    dimensions: [country, product]
+    description: Quantity × unit price over merchandise sale lines (excludes cancellations, adjustments, write-offs, bad debt, zero prices).
+
+  - name: returns_value
+    label: Returns
+    unit: GBP
+    kind: aggregate
+    source: fact_returns
+    expression: sum(return_value)
+    dimensions: [country, product]
+    description: Value of cancelled merchandise lines (positive amount).
+
+  - name: net_revenue
+    label: Net revenue
+    unit: GBP
+    kind: formula
+    op: difference
+    operands: [gross_revenue, returns_value]
+    description: Gross revenue minus returns in the same period.
+
+  - name: orders
+    label: Orders
+    unit: count
+    kind: aggregate
+    source: fact_sales
+    expression: count(DISTINCT invoice_no)
+    dimensions: [country]
+    description: Distinct invoices with at least one merchandise sale line (cancellation invoices excluded).
+
+  - name: average_order_value
+    label: Average order value
+    unit: GBP
+    kind: formula
+    op: ratio
+    operands: [gross_revenue, orders]
+    description: Gross revenue divided by orders.
+
+  - name: units_sold
+    label: Units sold
+    unit: count
+    kind: aggregate
+    source: fact_sales
+    expression: sum(quantity)
+    dimensions: [country, product]
+    description: Total quantity on merchandise sale lines.
+
+  - name: active_customers
+    label: Active customers
+    unit: count
+    kind: aggregate
+    source: fact_sales
+    expression: count(DISTINCT customer_key) FILTER (WHERE customer_key <> 'UNKNOWN')
+    dimensions: [country]
+    description: Known customers with at least one order in the period (lines without a customer id are excluded).
+
+  - name: new_customers
+    label: New customers
+    unit: count
+    kind: aggregate
+    source: dim_customer
+    expression: count(*) FILTER (WHERE NOT is_unknown)
+    dimensions: []
+    description: Known customers whose first-ever order falls in the period.
+
+  - name: repeat_customer_rate
+    label: Repeat customer rate
+    unit: ratio
+    kind: aggregate
+    source: customer_orders
+    expression: count(*) FILTER (WHERE orders >= 2)::DOUBLE / NULLIF(count(*), 0)
+    dimensions: []
+    description: Share of active customers with two or more orders within the period.
+
+  - name: return_rate_value
+    label: Return rate (by value)
+    unit: ratio
+    kind: formula
+    op: ratio
+    operands: [returns_value, gross_revenue]
+    description: Returns value divided by gross revenue (value-based, not a count of returned lines).

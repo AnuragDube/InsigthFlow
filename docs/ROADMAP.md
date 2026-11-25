@@ -50,7 +50,22 @@ InsigthFlow/
 Module dependency direction: `api → {ingestion, pipeline, quality, analytics, ai.*, audit} → {warehouse,
 metadata, ai.llm, core}`; `domains` is data read by pipeline/quality/analytics/nl2sql. No cycles.
 
-## 3. Roadmap A — Interview-ready MVP (Tue 24 → Fri 27 Nov)
+## Current delivery priorities
+
+The [verified status and rehearsal checklist](STATUS.md) govern the November 27 interview.
+M1 and M2 already exist. Rehearse the local M2 dashboard on Windows 11 with a fixture fallback,
+then sign off the dashboard reliability work. Defer live model integration, RAG, and public
+deployment until after the interview. The phase plan below records the original scope.
+
+The M3 offline Ask tab evaluates supported questions against all ten deterministic metrics.
+The validated provider interface selects a metric, and the server owns the date and data scope.
+Live-provider evaluation requires approved access and data-handling terms. Sequence private-pilot
+identity and isolation before customer data. Plan grounded document retrieval next
+if discovery shows demand. Introduce scikit-learn models only with a business baseline and
+time-based evaluations. Treat PySpark/Databricks parity as optional and require demonstrated value
+before adding infrastructure or new operating costs.
+
+## 3. Roadmap A — Original interview phase plan (Tue 24 → Fri 27 Nov)
 
 Each phase ends with tests run, a report, a git bundle for you to push, and **your approval**.
 **Honest capacity check:** six build phases of ~3–5 h each plus review/approval time is roughly 2.5 days of

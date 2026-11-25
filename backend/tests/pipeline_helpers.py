@@ -42,3 +42,17 @@ def ingest_fixtures(
         pq = paths.bronze_dir(source_id, ing.id) / "data.parquet"
         inputs.append(BatchInput(ingest_id=ing.id, parquet=pq, order=order))
     return inputs
+
+
+def published_fixture_gold(settings: Settings) -> tuple[Engine, OrgContext, uuid.UUID]:
+    """Ingest both fixture batches and publish them (quarantine gate relaxed for the fixtures)."""
+    from insightflow.domains.loader import load_domain_pack
+    from insightflow.pipeline.service import request_run, run_pipeline
+
+    engine, ctx, src = setup_source(settings)
+    ingest_fixtures(settings, engine, ctx, src)
+    run = request_run(ctx, engine, src, trigger="manual")
+    assert run is not None
+    pack = load_domain_pack("ecommerce").with_threshold("quarantine_ratio", 0.2)
+    assert run_pipeline(ctx, engine, settings, run.id, pack=pack)[-1].status == "succeeded"
+    return engine, ctx, src

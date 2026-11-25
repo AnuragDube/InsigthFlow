@@ -22,7 +22,13 @@ Eng = Annotated[Engine, Depends(get_engine)]
 def list_runs(ctx: Ctx, engine: Eng, dataset_id: Annotated[uuid.UUID, Query()]) -> Page[RunOut]:
     with session_scope(engine) as s:
         DataSourceRepo(s).get(ctx, dataset_id)
-        return Page(items=[RunOut.model_validate(r) for r in RunRepo(s).list_all(ctx, dataset_id)])
+        repo = RunRepo(s)
+        items = []
+        for r in repo.list_all(ctx, dataset_id):
+            out = RunOut.model_validate(r)
+            out.stages = [StageOut.model_validate(st) for st in repo.stages(ctx, r.id)]
+            items.append(out)
+        return Page(items=items)
 
 
 @router.get("/{run_id}")

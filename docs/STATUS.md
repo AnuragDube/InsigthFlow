@@ -1,77 +1,219 @@
-# Project status — read this first when resuming
+# InsightFlow project status
 
-Last updated: 2026-11-24 19:32 UTC (Wed 25 Nov, 01:02 IST) · Updated by: Copilot
+Updated 25 November 2026 (IST). Interview on Friday, 27 November 2026.
 
-## Where we are
-- **Phase 1 (architecture): approved 2026-11-24.**
-- **M1 = Phases 2+3 "Data foundation": complete on branch `m1-data-foundation`** (94 tests).
-  Published to GitHub at `AnuragDube/InsigthFlow`; Windows verification remains pending.
-  Independent review: 0 critical; 3 important + 2 re-graded findings fixed with regression tests.
-  `/security-review`: no findings.
-- Next: **M2 = Phase 4** — metric registry + metrics API + React dashboard.
-- Working title per handover: "Data Intelligence Platform"; `InsightFlow`/`insightflow` remain the
-  repo and package identifiers.
-- Interview: Fri 27 Nov 2026 (Associate Analyst). RAG is the first thing cut if time runs short.
+**M1 data foundation and M2 metrics dashboard are implemented.** The M2 reliability and demo
+workflow passed Linux validation. The November 27 priority is a rehearsal on Windows 11. Keep the
+current application local and use public or synthetic demo data.
 
-## What works (evidence)
-| Capability | Evidence |
+**M3 offline foundation is implemented.** The Ask tab maps supported questions and metric names
+to the existing registry. It shows the value, applied date range, published run, parameterized SQL,
+and metric definition. Unsupported questions are declined. Use the date fields or an ISO date
+range in the question. An opt-in Groq adapter passed mocked HTTP integration tests. Live provider
+activation and broader natural-language interpretation remain open.
+
+## Branch and design review
+
+| Ref | Evidence |
 |---|---|
-| FastAPI app: settings, JSON logs, correlation ids, problem+json errors, `/health`, `/ready` | `backend/tests/integration/test_health_and_errors.py` |
-| Localhost hardening: trusted hosts, client header on mutations, strict CORS, upload size pre-check | same + `test_api_datasets.py` |
-| Metadata (SQLite; PostgreSQL-compatible) with org- and dataset-bound composite FKs, migrations | `test_repositories.py`, `test_migrations.py`; migration also applied to PostgreSQL 16 by hand (no drift) |
-| Ingestion → immutable Bronze (raw + all-text Parquet + manifest), idempotent re-upload, rejections recorded | `test_ingestion.py` |
-| Silver: typing, quarantine with reason codes, flags, multiplicity rule | `test_silver.py` vs hand-computed `fixtures/ecommerce/expected.yaml` |
-| Gold star schema materialized in per-run `gold.duckdb` (+ Parquet) | `test_gold.py` |
-| 9 declarative quality rules, blocking vs warning gates | `test_quality.py` |
-| Runner: stages, transactional publish, blocked runs keep old Gold, coalesced re-runs, crash recovery, pruning | `test_pipeline_runner.py` |
-| Sandboxed read-only Gold reader (11 escape attempts blocked) | `backend/tests/security/test_gold_sandbox.py` |
-| HTTP API: datasets, uploads, load-sample, batch (de)activation, runs, quality | `test_api_datasets.py` |
-| Real UCI run: 1,067,371 lines → published Gold in ≈3.2 s; overlap 22,523 removed; reruns identical | `docs/DATA_PROFILE.md` (Linux container) |
-| **Not yet verified on the owner's Windows laptop** | everything above — CI includes a Windows job |
+| Remote default and `m1-data-foundation` | `b796cb4`, recording the M1 publication from the owner's Windows environment |
+| `m2-dashboard` | `be8a16e`, eight commits after the shared base `950e869`. Adds metrics, API, SPA and CI coverage |
+| Audit | `audit/lead-engineering-2026-11-25`, based on M2. The M1-only publication note was reconciled here |
+| Reliability | `fix/m2-dashboard-reliability`, based on the audit branch |
+| Demo workflow | `feat/m2-demo-workflow`, based on the reliability branch |
+| M3 offline analytics | `feat/m3-offline-analytics`, based on the demo branch |
 
-## Current task
-M1 is published to GitHub. Next: plan M2 (Phase 4: metric registry, metrics API, React dashboard).
+Remote branch discovery returned those two branches and no `main` branch. The selected starting
+checkout was local `work` at the M1 tip. Phase 1 was approved on 24 November. The architecture,
+data and security designs, roadmap, CLAUDE.md and ADRs 0001–0017 were reviewed. The modular monolith,
+SQLite metadata, DuckDB/Parquet analytics, and React/Vite UI remain appropriate at the present
+scale. ADR-0016 still leaves the authentication approach open. See the [ADR index](decisions/README.md)
+and [prior roadmap](ROADMAP.md).
 
-## Known minor issues (deferred from M1 review)
-- Revenue reconciliation rule reuses Silver flags (not fully independent of fact eligibility).
-- Bronze lacks `_source_file`/`_ingested_at` lineage columns; manifest lacks `received_at`.
-- Country names only trimmed, not normalized.
-- `load-sample` queues a run even when all files were already ingested.
-- A deleted published Gold file surfaces as 500 instead of a problem response.
-- CSV header read uses an unbounded `readline()` (bounded by the upload cap).
-- Product decisions pending: Excel-style dates (`12/1/2010 8:26`) are quarantined; re-uploading a
-  deactivated batch keeps it inactive.
+## Independent verification
 
-## Owner decisions
-- 2026-11-24: Owner delegated full technical ownership. Accepted defaults: Phase 1 architecture incl.
-  React; ADR-0001…0017 Accepted (0016 auth decided at P1 start); ADR-0017 upload semantics; metric
-  definitions as proposed; Phases 2+3 = one milestone; interview Fri 27 Nov, RAG first to cut.
-- Still escalated to owner: spending, credentials, external deployment, destructive actions.
+| Check | M1 `b796cb4` | M2 `be8a16e` |
+|---|---|---|
+| Linux, Python 3.12.14, pytest 9.2.0, frozen dependencies | 94 passed in 14.16 s | 119 passed in 20.48 s |
+| Ruff lint | Passed | Passed |
+| Ruff format | 64 already formatted | 73 already formatted |
+| mypy | Passed, 49 source files | Passed, 55 source files |
+| Frontend, Linux with Node 24.22.3 | No frontend | TypeScript passed. Vitest 13 passed across 3 files. Vite build passed, with a 686.17 kB minified JS chunk warning |
+| Playwright | No frontend | 2 passed in 8.3 s (desktop and phone). The proxy blocked the pinned Chrome download. A temporary configuration used installed Chromium 156.0.8078.79 |
 
-## Blockers / environment
-- Cloud dev container cannot push to GitHub; M1 was published from the owner's Windows environment.
-- Network: `archive.ics.uci.edu` allowed via the personal environment "InsigthFlow" (created
-  2026-11-24). `api.groq.com` still blocked — requested with the key at Phase 5.
-- Context7 MCP not connected; library behaviour verified by tests/spikes instead.
+The Windows CI matrix is configured for Python. The owner's Windows 11 rehearsal and PostgreSQL
+runtime validation were outside this Linux run. The existing PostgreSQL
+16 migration spike and earlier UCI results are recorded in [spikes](spikes/README.md) and
+[Data Profile](DATA_PROFILE.md). A fresh Linux M2 run downloaded and verified the UCI archive, processed 1,067,371
+Silver input rows, published after all 9 checks passed, and returned 10 dashboard KPIs with the
+published run ID.
 
-## How to run (Windows PowerShell)
+### Reliability branch verification
+
+- `uv run --frozen pytest -o addopts='' -ra` collected and passed **123 tests in 21.55 s**.
+  Ruff lint passed, all 74 Python files were formatted, and mypy checked 55 source files.
+- `npm run typecheck`, `npm test` and `npm run build` passed on Node 24.22.3.
+  Vitest passed **14 tests in 3 files**. The existing Vite chunk-size warning remains.
+- `npm run e2e` with an ephemeral configuration for system Chromium 156.0.8078.79
+  passed **2 tests in 5.8 s** across desktop and phone.
+- The checksum-verified UCI sample was loaded into an isolated SQLite store through the
+  current API. The new run published after all nine quality checks passed. The dashboard
+  returned ten KPIs and identified that same run.
+
+### Demo workflow branch verification
+
+- Linux backend checks passed on Python 3.12.14. Ruff lint passed, all 74 files were formatted,
+  mypy checked 55 source files, and pytest passed **123 tests in 20.18 s**.
+- On Node 22.23.5, `npm ci`, `npm run typecheck`, `npm test`, and `npm run build` passed.
+  Vitest passed **15 tests in 3 files**. Vite still reports its chunk-size warning.
+- Playwright with system Chromium 156.0.8078.79 passed **4 tests in 18.4 s**. Both desktop and
+  phone verified the offline sample, dataset creation, rebuild, and a blocked upload leaving
+  the prior publication and dashboard totals intact.
+
+### M3 offline verification
+
+- The Groq adapter is injectable through the app factory. Its requests contain question text
+  and the metric catalog. It handles abstention, malformed or oversized responses and rate-limit
+  errors. The standard app remains offline. Live access, terms, rate limits and quality
+  evaluation must be resolved before activation.
+- Latest local checks passed: **143 backend tests in 25.89 s**, Ruff lint and format (77 files),
+  mypy (57 source files), and **4 browser tests in 20.9 s** using Node 22 and system Chromium.
+  GitHub Actions run 45562356067 reported a Windows-only JavaScript MIME mismatch in pytest
+  (135 passed, 1 failed). The SPA now explicitly serves JavaScript as `text/javascript`.
+  The local regression test simulates the Windows MIME mapping. All four checks passed in GitHub
+  Actions run [45563919813](https://github.com/AnuragDube/InsigthFlow/actions/runs/45563919813),
+  including Windows backend pytest.
+
+- The validated provider interface is now in place. A provider receives metric descriptions and
+  question text and can return a registered metric identifier. Dates are interpreted and
+  validated by the server. The running application selects its offline provider by default.
+- The follow-up evaluation checked all ten metrics, date-field equivalence, conflicting or invalid
+  dates, and rejection of an unregistered metric from a stub provider. Linux checks passed with
+  **136 backend tests in 27.09 s**, **15 frontend tests**, and **4 Playwright tests in 19.9 s**
+  on system Chromium. Ruff, mypy, TypeScript and the build passed. The owner's Windows 11 rehearsal remains unverified.
+
+- Linux Python 3.12.14. Ruff lint and format passed (74 files formatted), mypy passed
+  (55 source files), and pytest passed **129 tests in 24.04 s**.
+- Linux Node 22.23.5. TypeScript and Vite build passed with the existing chunk-size warning.
+  Vitest passed **15 tests**. Playwright passed **4 tests in 19.8 s** using system Chromium
+  156.0.8078.79. Desktop and phone checked the fixture answer, SQL evidence, and an unsupported
+  question, alongside both dashboard and quality-gate flows.
+- The question text selects a registry entry through whole-question matching. The compiler
+  binds dates on the locked read-only Gold connection. Formula metrics show the SQL for their
+  operands and the formula definition. Hosted inference, model-generated SQL, and live evaluation
+  remain outside the verified scope.
+
+## Capability inventory
+
+| State | Capabilities and limits |
+|---|---|
+| Implemented | FastAPI liveness/readiness, typed settings, correlated problem responses, SQLite/Alembic, basic system audit events, e-commerce CSV ingestion, batch toggles, run and quality APIs. |
+| Implemented | Bronze raw CSV, all-text Parquet, hash and manifest. Silver typing, quarantine, adjustments and overlap handling. Gold sales/returns facts, dimensions and daily aggregates. Gated publication, run inputs and stage records, retry coalescing, startup recovery and pruning. |
+| Implemented on M2 | Ten metric definitions, parameterized dashboard/series/breakdown queries, React Overview and Data pages, same-origin SPA with CSP, keyboard-accessible controls designed into the UI. Desktop/phone projects cover the fixture-backed publish path. |
+| Partial | Organization-scoped repositories and composite keys operate under one demo org. PostgreSQL compatibility has spike evidence. Pipeline execution and recovery assume one server process. Basic audit trail lacks authenticated actor identity. |
+| Missing | Auth and RBAC, enforced public read-only demo mode, PostgreSQL application CI and tenant RLS, scheduled jobs and operational alerts, NL-to-SQL, ADR-0009’s Gold metric views and provider abstraction, RAG/document citations, connectors, ML, billing and commercial operations. |
+
+## Pipeline and quality assessment
+
+1. Bronze streams and hashes input, saves immutable files under server-generated IDs and
+   deduplicates identical uploads per dataset. A stored batch records durable pending work.
+2. Silver uses explicit typing and quarantine, preserving within-batch multiplicity and removing
+   overlap across batches via maximum multiplicity. Hand-computed fixtures cover returns,
+   adjustments, duplicates, missing customers and precision.
+3. Gold materializes trusted SQL into per-run DuckDB and Parquet. Nine declarative checks
+   comprise six blocking rules and three warnings. Checks cover quarantine, conservation of
+   rows, key completeness, dimensional links and revenue reconciliation. Failed gates preserve
+   the prior `published_run_id`.
+4. SQLite publishes the pointer and records completion in one transaction. Artifacts live on the
+   filesystem, so crash recovery and retention remain operational concerns. Run inputs are
+   snapshotted when execution begins. The M2 dashboard reads Gold via the locked, read-only adapter.
+
+## Risks and debt in priority order
+
+| Priority | Finding | Before closing it |
+|---|---|---|
+| Release blocker | All HTTP calls resolve to the demo org. The custom mutation header, explicit CORS, trusted hosts, body cap and CSP harden a local demo. ADR-0016 auth/RBAC and the designed public read-only mode are absent. | Loopback only. Require authentication, authorization and cross-org HTTP tests before handling customer data or exposing a service. |
+| Addressed on reliability branch | Dashboard freshness, quality and results share a run ID, including when a new publication arrives mid-request. Missing published Gold files return a safe 503. | Windows rehearsal remains open. |
+| High before shared deployment | Analytics limits ranges to 3,660 days. Endpoint-level deadlines and concurrency budgets are absent. Uploads cap the body and spool size, but header reads can consume the whole allowed body, and cumulative storage is unbounded. | Bound query work, cap header length, add storage quotas and define safe retention before sharing. |
+| High before parallel workers | Startup recovery treats all active runs as interrupted. Artifact pruning and local storage assume single-process ownership. A process killed before the ingest transaction commits can leave unreferenced files. | Retain one process for now. Test reconciliation and restore, and add durable claims only when a second worker is necessary. |
+| Medium | Revenue reconciliation shares Silver eligibility flags with Gold. The overlap warning uses a nonnegative threshold and serves as telemetry. Bronze manifest lacks receipt time and row lineage lacks file/time fields. Country names are trim-only. | Add independent control totals and lineage. Preserve raw values and confirm normalization policy. |
+| Medium | Repeated sample loads can enqueue an unchanged rebuild. Date parsing quarantines ambiguous Excel-style values. Re-uploading an inactive batch keeps it inactive. | Confirm intended UX, document it and cover approved behavior with regressions. |
+| Medium | TypeScript build metadata is tracked. The bundle exceeds Vite's default chunk threshold. The threat model describes future security controls alongside shipped controls, and dependency audit gates are absent from CI. | Ignore generated metadata in a follow-up, measure client startup, and align the security inventory with evidence. Add dependency checks before a beta. |
+
+The existing Gold sandbox tests passed as part of both backend suites. They cover the reader
+boundary. Generated-SQL validation, query isolation from authenticated tenants, vendor data handling
+and rate limits remain future work. This audit used code review and the repository suites.
+
+## November 27 interview priorities
+
+1. **25 November, P0:** Freeze the M2 demo scope. Keep scope changes out of the
+   demo path. Use the checked-in `batch_b.csv` fixture as the guaranteed offline fallback and retain
+   the checksum-verified UCI dataset if local rehearsal confirms it.
+2. **26 November, P0:** Rehearse the README workflow on Windows 11 with Python 3.12 and Node 22.
+   Verify first load, publication, and the Overview and Data views. In a separate fixture dataset,
+   publish `batch_b.csv`, then upload `batch_a.csv` and verify that the quality gate keeps the prior run. Prepare a screenshot or short local recording as fallback.
+3. **27 November, P0:** Use a five-minute walkthrough. Load data, show run and quality results,
+   move to the dashboard and explain a KPI's grain and provenance, then switch to the fixture dataset
+   to demonstrate the blocked batch. Prepare answers about overlapping extracts, atomic publication, sandbox limits, and
+   the trade-offs of SQLite metadata with DuckDB analytics.
+4. **Hold until after the interview:** New AI features, RAG, deployment, infrastructure changes
+   and UI redesign. Use any remaining time to rehearse.
+
+### Recommended next engineering milestone
+
+**M2 Windows sign-off.** Rehearse the fixture-backed flow on Windows 11 with Node 22 and Python
+3.12, including a successful publish followed by a blocked fixture. The publication consistency,
+missing artifact and range limit changes have passed the Linux quality gates. After the interview,
+use the commercial sequence below to prioritize the next implementation.
+
+## Commercial sequence after the interview
+
+1. **Private pilot foundations.** Decide ADR-0016 and implement identity, RBAC, cross-org tests,
+   PostgreSQL CI, quotas, audit identity, retention/deletion and a verified backup/restore
+   procedure before accepting customer data. Keep deployments and costs subject to owner approval.
+2. **M3, offline-first NL-to-SQL.** Validate demand before connecting a provider. Evaluate with a
+   fake provider, result-based fixtures, an allowlisted read-only query interface and resource
+   budgets. Keep a provider call optional until access, quota and data-handling terms are approved.
+   Defer RAG unless user feedback supports document search.
+3. **Pilot and iterate.** Measure repeat use and accuracy with invited users. Prioritize connectors,
+   scheduling and monitoring using pilot evidence. Add shared storage or worker infrastructure
+   when durability or throughput requirements justify them.
+4. **Commercial launch after budget and readiness approval.** Require reliable storage, restore
+   drills, tenant isolation assurance, privacy terms, dependency monitoring, incident handling and
+   a supported provider plan before taking paid accounts.
+
+### Offline rehearsal setup
+
+After installing dependencies and building the frontend, point the sample loader at a folder
+containing only the good fixture. Run from the repository root in PowerShell.
+
 ```powershell
-uv sync
-uv run pytest
-uv run python scripts/fetch_sample_data.py
-uv run uvicorn insightflow.api.app:create_app --factory --host 127.0.0.1 --port 8000
-```
-In a second PowerShell window:
-```powershell
-$h = @{ "X-InsightFlow-Client" = "web" }
-$ds = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/datasets -Headers $h `
-      -ContentType "application/json" -Body '{"name":"UCI Online Retail II"}'
-$run = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/v1/datasets/$($ds.id)/load-sample" -Headers $h
-Start-Sleep -Seconds 10
-Invoke-RestMethod "http://127.0.0.1:8000/api/v1/pipeline-runs/$($run.run_id)" | ConvertTo-Json -Depth 5
-(Invoke-RestMethod "http://127.0.0.1:8000/api/v1/pipeline-runs/$($run.run_id)/quality").items | Format-Table
+$sampleDir = Join-Path ([System.IO.Path]::GetTempPath()) ("insightflow-demo-" + [guid]::NewGuid())
+New-Item -ItemType Directory -Path $sampleDir | Out-Null
+Copy-Item backend/tests/fixtures/ecommerce/batch_b.csv $sampleDir
+$env:INSIGHTFLOW_SAMPLE_DIR = $sampleDir
+$env:INSIGHTFLOW_DATA_DIR = Join-Path $sampleDir "data"
+$db = (Join-Path $sampleDir "metadata.sqlite3").Replace([char]92, [char]47)
+$env:INSIGHTFLOW_DATABASE_URL = "sqlite:///$db"
+$env:INSIGHTFLOW_FRONTEND_DIST = "frontend/dist"
+uv run --frozen uvicorn insightflow.api.app:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
-## Plans & ledgers
-- M1 plan: `docs/superpowers/plans/2026-11-25-m1-data-foundation.md`
-- Execution ledger (gitignored scratch): `.superpowers/sdd/2026-11-25-m1-data-foundation/progress.md`
+Open the local dashboard and choose **Load sample data**. Then demonstrate the quality gate
+without modifying the sample dataset:
+
+1. In **Data**, choose **New dataset**, name it `Quality gate rehearsal`, and create it.
+2. Upload `backend/tests/fixtures/ecommerce/batch_b.csv` and wait for **Published**. In **Overview**,
+   confirm **£75.75 gross revenue from 4 orders**.
+3. Upload `batch_a.csv` to the same rehearsal dataset. Show **Blocked by quality checks** and
+   the failed quarantine-ratio check. Return to **Overview** and confirm the same headline.
+4. If asked to recover, choose **Exclude batch_a.csv**. Excluding it queues a new run. To rebuild
+   from the active uploads after a missing Gold file, use **Rebuild dashboard** in **Processing runs**.
+
+The browser tests verify the fixture-backed publish, explicit rebuild, and blocked attempt on
+desktop and phone. They compare the published run ID before and after the blocked upload.
+Windows execution remains part of the rehearsal.
+
+Use the [Windows PowerShell quickstart](../README.md#quickstart-windows-11-powershell). Application
+checks use local fixtures and require no credentials. The audit, reliability and demo branches
+are local.

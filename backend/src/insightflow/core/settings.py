@@ -29,6 +29,7 @@ class Settings(BaseSettings):
         default="2GB", pattern=r"^[0-9]{1,6}(\.[0-9]{1,3})?(KB|MB|GB)$"
     )
     duckdb_threads: int = Field(default=4, ge=1, le=64)
+    frontend_dist: Path | None = None  # built SPA (frontend/dist) served same-origin when set
     code_version: str = "dev"  # set to the git SHA in deployments (reproducibility)
 
 

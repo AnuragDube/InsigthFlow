@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import Request
 from sqlalchemy.engine import Engine
 
+from insightflow.analytics.question_provider import QuestionProvider
 from insightflow.core.context import OrgContext
 from insightflow.core.settings import Settings
 
@@ -17,6 +18,11 @@ def get_settings_dep(request: Request) -> Settings:
 def get_engine(request: Request) -> Engine:
     engine: Engine = request.app.state.engine
     return engine
+
+
+def get_question_provider(request: Request) -> QuestionProvider | None:
+    provider: QuestionProvider | None = request.app.state.question_provider
+    return provider
 
 
 def get_org_context(request: Request) -> OrgContext:
