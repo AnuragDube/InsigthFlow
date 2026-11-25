@@ -69,6 +69,17 @@ export function Overview({ datasetId, onOpenData }: { datasetId: string; onOpenD
       </section>
     );
   }
+  if (q.error instanceof ApiError && q.error.type === "/errors/published-data-unavailable") {
+    return (
+      <section className="empty">
+        <h1 className="summary">Published data is unavailable.</h1>
+        <p>{q.error.message}</p>
+        <div className="actions">
+          <button type="button" className="btn" onClick={onOpenData}>Open Data</button>
+        </div>
+      </section>
+    );
+  }
   if (q.error instanceof ApiError && q.error.type === "/errors/validation-failed" && range.from) {
     return (
       <div className="actions">

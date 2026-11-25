@@ -80,7 +80,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 .tab[aria-current="page"] { color: var(--ink); background: var(--ledger-tint); font-weight: 600; }
 .field { display: flex; align-items: center; gap: 0.5rem; font-size: var(--t-sm); color: var(--ink-soft); }
-select, input[type="date"] {
+select, input[type="date"], input[type="text"] {
   background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius);
   padding: 0.35rem 0.5rem; min-height: 2.25rem;
 }

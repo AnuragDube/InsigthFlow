@@ -26,6 +26,8 @@ uv run uvicorn insightflow.api.app:create_app --factory --host 127.0.0.1 --port 
 ```
 
 Open http://127.0.0.1:8000 and choose **Load sample data**. The first run takes a few seconds.
+Use **Data → New dataset** to keep later uploads separate from the sample dashboard. For an
+offline rehearsal with deterministic results, see [the fixture walkthrough](docs/STATUS.md#offline-rehearsal-setup).
 
 For frontend development with hot reload, run the API as above and `npm run dev` in `frontend/`
 (http://localhost:5173, proxies `/api`). End-to-end tests: `npm run e2e` in `frontend/`.

@@ -75,3 +75,16 @@ it("labels a capped default as latest data", async () => {
     "true",
   );
 });
+
+it("offers a path to rebuild when a published file is missing", async () => {
+  const openData = vi.fn();
+  mockFetch((url) =>
+    url.includes("/dashboard")
+      ? { status: 503, body: { type: "/errors/published-data-unavailable", detail: "Rebuild the dataset." } }
+      : undefined,
+  );
+  renderWithQuery(<Overview datasetId="d1" onOpenData={openData} />);
+  const button = await screen.findByRole("button", { name: "Open Data" });
+  button.click();
+  expect(openData).toHaveBeenCalledOnce();
+});

@@ -51,6 +51,7 @@ export const api = {
     return request<Upload>(`/datasets/${id}/uploads`, { method: "POST", body: form });
   },
   loadSample: (id: string) => request<RunRequest>(`/datasets/${id}/load-sample`, { method: "POST" }),
+  rebuild: (id: string) => request<RunRequest>(`/datasets/${id}/pipeline-runs`, { method: "POST" }),
   setBatchActive: (id: string, ingestionId: string, isActive: boolean) =>
     request<RunRequest>(`/datasets/${id}/ingestions/${ingestionId}`, {
       method: "PATCH",

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api } from "./api/client";
-import type { Dataset } from "./api/types";
+import type { Dataset, Page } from "./api/types";
 import { Data } from "./pages/Data";
 import { Overview } from "./pages/Overview";
 
@@ -35,8 +35,8 @@ function Welcome({ onReady }: { onReady: (id: string, tab: Tab) => void }) {
     <section className="empty">
       <h1 className="summary">See what your shop’s orders say, with every number checked.</h1>
       <p>
-        Start with two years of real orders from a UK online shop, or upload your own order lines. Each upload is
-        cleaned, checked and turned into the dashboard in a few seconds.
+        Load sample orders or upload your own order lines. Each upload is cleaned and checked before it appears in
+        the dashboard.
       </p>
       {error && <p className="notice error">{error}</p>}
       <div className="actions">
@@ -52,9 +52,23 @@ function Welcome({ onReady }: { onReady: (id: string, tab: Tab) => void }) {
 }
 
 export function App() {
+  const qc = useQueryClient();
   const datasets = useQuery({ queryKey: ["datasets"], queryFn: api.datasets });
   const [tab, setTab] = useState<Tab>(tabFromHash);
   const [chosen, setChosen] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const create = useMutation({
+    mutationFn: api.createDataset,
+    onSuccess: (dataset) => {
+      qc.setQueryData<Page<Dataset>>(["datasets"], (previous) => ({
+        items: [...(previous?.items ?? []), dataset],
+      }));
+      setChosen(dataset.id);
+      setName("");
+      setCreating(false);
+    },
+  });
 
   useEffect(() => {
     const onHash = () => setTab(tabFromHash());
@@ -112,7 +126,47 @@ export function App() {
           />
         )}
         {current && tab === "overview" && <Overview key={current.id} datasetId={current.id} onOpenData={() => go("data")} />}
-        {current && tab === "data" && <Data key={current.id} datasetId={current.id} />}
+        {current && tab === "data" && (
+          <>
+            {creating ? (
+              <form
+                className="toolbar"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (name.trim() && !create.isPending) create.mutate(name.trim());
+                }}
+              >
+                <label className="field">
+                  Dataset name
+                  <input type="text" required maxLength={200} value={name} onChange={(event) => setName(event.target.value)} />
+                </label>
+                <button type="submit" className="btn" disabled={create.isPending || !name.trim()}>
+                  Create dataset
+                </button>
+                <button
+                  type="button"
+                  className="btn quiet"
+                  disabled={create.isPending}
+                  onClick={() => {
+                    create.reset();
+                    setName("");
+                    setCreating(false);
+                  }}
+                >
+                  Cancel
+                </button>
+                {create.error && <p className="notice error" role="alert">{create.error.message}</p>}
+              </form>
+            ) : (
+              <div className="toolbar">
+                <button type="button" className="btn quiet" onClick={() => setCreating(true)}>
+                  New dataset
+                </button>
+              </div>
+            )}
+            <Data key={current.id} datasetId={current.id} />
+          </>
+        )}
       </main>
     </div>
   );

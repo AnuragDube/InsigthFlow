@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import type { QualityResult, Run, RunStatus } from "../api/types";
 import { formatDuration, formatValue } from "../lib/format";
@@ -47,6 +47,13 @@ export function Data({ datasetId }: { datasetId: string }) {
     refetchInterval: (q) => (q.state.data?.items.some((r) => ACTIVE.has(r.status)) ? 1500 : false),
   });
   const runId = selected ?? runs.data?.items[0]?.id ?? null;
+  const latestRun = runs.data?.items[0];
+  useEffect(() => {
+    if (latestRun?.status === "succeeded") {
+      void qc.invalidateQueries({ queryKey: ["dashboard", datasetId] });
+      void qc.invalidateQueries({ queryKey: ["datasets"] });
+    }
+  }, [datasetId, latestRun?.id, latestRun?.status, qc]);
   const runStatus = runs.data?.items.find((r) => r.id === runId)?.status;
   const quality = useQuery({
     // Status is part of the key: results fetched while a run was still queued are empty and must
@@ -94,6 +101,14 @@ export function Data({ datasetId }: { datasetId: string }) {
     },
     onError,
   });
+  const rebuild = useMutation({
+    mutationFn: () => api.rebuild(datasetId),
+    onSuccess: () => {
+      setMessage({ kind: "ok", text: "Rebuilding the dashboard data." });
+      refresh();
+    },
+    onError,
+  });
 
   return (
     <>
@@ -108,7 +123,7 @@ export function Data({ datasetId }: { datasetId: string }) {
         <h2>Add data</h2>
         <p className="hint">
           CSV with columns Invoice, StockCode, Description, Quantity, InvoiceDate, Price, Customer ID, Country. Each
-          upload is kept unchanged; lines repeated across uploads are counted once.
+          upload is kept unchanged. Overlapping exports are reconciled while repeats within a batch are preserved.
         </p>
         <div className="toolbar">
           <input
@@ -177,6 +192,18 @@ export function Data({ datasetId }: { datasetId: string }) {
       <section className="section">
         <h2>Processing runs</h2>
         <p className="hint">Each run rebuilds the dashboard from all included uploads. A blocked run never replaces published data.</p>
+        {batches.data?.items.some((batch) => batch.is_active) && (
+          <div className="toolbar">
+            <button
+              type="button"
+              className="btn quiet"
+              disabled={rebuild.isPending || runs.data?.items.some((run) => ACTIVE.has(run.status))}
+              onClick={() => rebuild.mutate()}
+            >
+              Rebuild dashboard
+            </button>
+          </div>
+        )}
         {runs.data?.items.length ? (
           <div className="table-wrap">
             <table>

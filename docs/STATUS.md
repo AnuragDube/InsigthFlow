@@ -2,9 +2,9 @@
 
 Updated 25 November 2026 (IST). Interview on Friday, 27 November 2026.
 
-**M1 data foundation and M2 metrics dashboard are implemented.** The M2 reliability changes
-passed Linux validation. The November 27 priority is a rehearsed, offline-capable M2 demo
-on Windows 11. Keep the current application local and use public or synthetic demo data.
+**M1 data foundation and M2 metrics dashboard are implemented.** The M2 reliability and demo
+workflow passed Linux validation. The November 27 priority is a rehearsal on Windows 11. Keep the
+current application local and use public or synthetic demo data.
 
 ## Branch and design review
 
@@ -14,6 +14,7 @@ on Windows 11. Keep the current application local and use public or synthetic de
 | `m2-dashboard` | `be8a16e`, eight commits after the shared base `950e869`. Adds metrics, API, SPA and CI coverage |
 | Audit | `audit/lead-engineering-2026-11-25`, based on M2. The M1-only publication note was reconciled here |
 | Reliability | `fix/m2-dashboard-reliability`, based on the audit branch |
+| Demo workflow | `feat/m2-demo-workflow`, based on the reliability branch |
 
 Remote branch discovery returned those two branches and no `main` branch. The selected starting
 checkout was local `work` at the M1 tip. Phase 1 was approved on 24 November. The architecture,
@@ -33,7 +34,7 @@ and [prior roadmap](ROADMAP.md).
 | Frontend, Linux with Node 24.22.3 | No frontend | TypeScript passed. Vitest 13 passed across 3 files. Vite build passed, with a 686.17 kB minified JS chunk warning |
 | Playwright | No frontend | 2 passed in 8.3 s (desktop and phone). The proxy blocked the pinned Chrome download. A temporary configuration used installed Chromium 156.0.8078.79 |
 
-The Windows CI matrix is configured for Python. Windows 11 execution, Node 22 parity, hosted
+The Windows CI matrix is configured for Python. Windows 11 execution, hosted
 CI results, and PostgreSQL runtime validation were outside this Linux run. The existing PostgreSQL
 16 migration spike and earlier UCI results are recorded in [spikes](spikes/README.md) and
 [Data Profile](DATA_PROFILE.md). A fresh Linux M2 run downloaded and verified the UCI archive, processed 1,067,371
@@ -51,6 +52,16 @@ published run ID.
 - The checksum-verified UCI sample was loaded into an isolated SQLite store through the
   current API. The new run published after all nine quality checks passed. The dashboard
   returned ten KPIs and identified that same run.
+
+### Demo workflow branch verification
+
+- Linux backend checks passed on Python 3.12.14. Ruff lint passed, all 74 files were formatted,
+  mypy checked 55 source files, and pytest passed **123 tests in 20.18 s**.
+- On Node 22.23.5, `npm ci`, `npm run typecheck`, `npm test`, and `npm run build` passed.
+  Vitest passed **15 tests in 3 files**. Vite still reports its chunk-size warning.
+- Playwright with system Chromium 156.0.8078.79 passed **4 tests in 18.4 s**. Both desktop and
+  phone verified the offline sample, dataset creation, rebuild, and a blocked upload leaving
+  the prior publication and dashboard totals intact.
 
 ## Capability inventory
 
@@ -148,9 +159,21 @@ $env:INSIGHTFLOW_FRONTEND_DIST = "frontend/dist"
 uv run --frozen uvicorn insightflow.api.app:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
-Open the local dashboard and choose **Load sample data**. The browser test verified the equivalent
-isolated flow on Linux, including **£75.75 gross revenue from 4 orders**. Windows execution of
-these commands is part of rehearsal.
+Open the local dashboard and choose **Load sample data**. Then demonstrate the quality gate
+without modifying the sample dataset:
+
+1. In **Data**, choose **New dataset**, name it `Quality gate rehearsal`, and create it.
+2. Upload `backend/tests/fixtures/ecommerce/batch_b.csv` and wait for **Published**. In **Overview**,
+   confirm **£75.75 gross revenue from 4 orders**.
+3. Upload `batch_a.csv` to the same rehearsal dataset. Show **Blocked by quality checks** and
+   the failed quarantine-ratio check. Return to **Overview** and confirm the same headline.
+4. If asked to recover, choose **Exclude batch_a.csv**. Excluding it queues a new run. To rebuild
+   from the active uploads after a missing Gold file, use **Rebuild dashboard** in **Processing runs**.
+
+The browser tests verify the fixture-backed publish, explicit rebuild, and blocked attempt on
+desktop and phone. They compare the published run ID before and after the blocked upload.
+Windows execution remains part of the rehearsal.
 
 Use the [Windows PowerShell quickstart](../README.md#quickstart-windows-11-powershell). Application
-checks use local fixtures and require no credentials. Both topic branches are local.
+checks use local fixtures and require no credentials. The audit, reliability and demo branches
+are local.
