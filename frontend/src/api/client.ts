@@ -1,4 +1,4 @@
-import type { Dashboard, Dataset, DocumentCitation, Ingestion, MetricAnswer, Page, QualityResult, Run, RunRequest, SalesForecast, SearchDocument, Upload } from "./types";
+import type { CustomerSegments, Dashboard, Dataset, DocumentCitation, Ingestion, MetricAnswer, Page, QualityResult, Run, RunRequest, SalesForecast, SearchDocument, Upload } from "./types";
 
 /** Error carrying the server's RFC 9457 problem details. */
 export class ApiError extends Error {
@@ -44,6 +44,7 @@ const json = (body: unknown): RequestInit => ({
 export const api = {
   sessionOptions: () => request<{ interactive: boolean }>("/session"),
   signOut: () => request<void>("/session", { method: "DELETE" }),
+  customerSegments: (id: string) => request<CustomerSegments>(`/datasets/${id}/customer-segments`),
   forecast: (id: string) => request<SalesForecast>(`/datasets/${id}/forecast`),
   datasets: () => request<Page<Dataset>>("/datasets"),
   createDataset: (name: string) => request<Dataset>("/datasets", json({ name })),

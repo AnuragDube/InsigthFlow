@@ -24,4 +24,9 @@ test("forecast shows two methods and their historical errors", async ({ page }, 
   if (await picker.isVisible()) await picker.selectOption({ label: name });
   await expect(page.getByRole("table").getByRole("row")).toHaveCount(8);
   await expect(page.getByText(/Mean absolute error over 7 held-out days/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Customers", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Customer segments" })).toBeVisible();
+  const repeat = page.getByRole("row").filter({ hasText: "Recent repeat" });
+  await expect(repeat).toContainText("£70.00");
 });

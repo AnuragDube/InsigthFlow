@@ -34,6 +34,8 @@ Use **Documents** to upload small UTF-8 text or Markdown files and search for ex
 source line numbers. Document search also works offline.
 Use **Forecast** on a published dataset with at least 35 calendar days to compare two
 seven-day gross-revenue forecasts and their historical mean absolute errors.
+Use **Customers** to compare four segments based on when known customers last bought,
+how often they ordered, and how much they spent in the published sales window.
 
 For frontend development with hot reload, run the API as above and `npm run dev` in `frontend/`
 (http://localhost:5173, proxies `/api`). End-to-end tests: `npm run e2e` in `frontend/`.

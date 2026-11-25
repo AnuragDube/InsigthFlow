@@ -2,16 +2,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ApiError, api } from "./api/client";
 import type { Dataset, Page } from "./api/types";
+import { Customers } from "./pages/Customers";
 import { Data } from "./pages/Data";
 import { Documents } from "./pages/Documents";
 import { Forecast } from "./pages/Forecast";
 import { Overview } from "./pages/Overview";
 import { Questions } from "./pages/Questions";
 
-type Tab = "overview" | "data" | "questions" | "documents" | "forecast";
+type Tab = "overview" | "data" | "questions" | "documents" | "forecast" | "customers";
 function tabFromHash(): Tab {
   const hash = window.location.hash;
   if (hash === "#data") return "data";
+  if (hash === "#customers") return "customers";
   if (hash === "#forecast") return "forecast";
   if (hash === "#documents") return "documents";
   return hash === "#questions" ? "questions" : "overview";
@@ -151,6 +153,9 @@ export function App() {
               <button type="button" className="tab" aria-current={tab === "forecast" ? "page" : undefined} onClick={() => go("forecast")}>
                 Forecast
               </button>
+              <button type="button" className="tab" aria-current={tab === "customers" ? "page" : undefined} onClick={() => go("customers")}>
+                Customers
+              </button>
             </>
           ) : (
             <button type="button" className="tab" aria-current={tab !== "documents" ? "page" : undefined} onClick={() => go("overview")}>
@@ -193,6 +198,7 @@ export function App() {
         )}
         {tab === "documents" && <Documents />}
         {current && tab === "overview" && <Overview key={current.id} datasetId={current.id} onOpenData={() => go("data")} />}
+        {current && tab === "customers" && <Customers key={current.id} datasetId={current.id} runId={current.published_run_id} />}
         {current && tab === "forecast" && <Forecast key={current.id} datasetId={current.id} runId={current.published_run_id} />}
         {current && tab === "questions" && <Questions key={current.id} datasetId={current.id} />}
         {current && tab === "data" && (

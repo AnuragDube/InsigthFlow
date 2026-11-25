@@ -137,3 +137,17 @@ export interface SalesForecast {
     weekday_average_mae: number;
   };
 }
+
+export interface CustomerSegments {
+  published_run_id: string;
+  from: string;
+  as_of: string;
+  unit: Unit;
+  segments: {
+    key: string;
+    definition: string;
+    customers: number;
+    orders: number;
+    gross_revenue: number;
+  }[];
+}
