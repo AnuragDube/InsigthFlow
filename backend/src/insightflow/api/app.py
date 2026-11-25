@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from insightflow.analytics.question_provider import QuestionProvider
 from insightflow.api import middleware
 from insightflow.api.background import run_in_background
 from insightflow.api.body_limit import BodySizeLimitMiddleware
@@ -44,7 +45,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.engine.dispose()
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, *, question_provider: QuestionProvider | None = None
+) -> FastAPI:
     settings = settings or get_settings()
     if settings.environment != "test":
         configure_logging()
@@ -56,6 +59,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url=None,
     )
     app.state.settings = settings
+    app.state.question_provider = question_provider
     app.state.engine = make_engine(settings.database_url)
     middleware.install(app)
     app.add_middleware(

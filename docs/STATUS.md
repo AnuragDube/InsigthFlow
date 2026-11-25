@@ -9,7 +9,8 @@ current application local and use public or synthetic demo data.
 **M3 offline foundation is implemented.** The Ask tab maps supported questions and metric names
 to the existing registry. It shows the value, applied date range, published run, parameterized SQL,
 and metric definition. Unsupported questions are declined. Use the date fields or an ISO date
-range in the question. Hosted model integration and broader natural-language interpretation remain open.
+range in the question. An opt-in Groq adapter passed mocked HTTP integration tests. Live provider
+activation and broader natural-language interpretation remain open.
 
 ## Branch and design review
 
@@ -70,6 +71,15 @@ published run ID.
   the prior publication and dashboard totals intact.
 
 ### M3 offline verification
+
+- The Groq adapter is injectable through the app factory. Its requests contain question text
+  and the metric catalog. It handles abstention, malformed or oversized responses and rate-limit
+  errors. The standard app remains offline. Live access, terms, rate limits and quality
+  evaluation must be resolved before activation.
+- Latest local checks passed: **143 backend tests in 25.89 s**, Ruff lint and format (77 files),
+  mypy (57 source files), and **4 browser tests in 20.9 s** using Node 22 and system Chromium.
+  GitHub Actions run 45562356067 reported a failure in Windows pytest. Its detailed log requires
+  a signed-in GitHub session, so the underlying failure is pending diagnosis.
 
 - The validated provider interface is now in place. A provider receives metric descriptions and
   question text and can return a registered metric identifier. Dates are interpreted and

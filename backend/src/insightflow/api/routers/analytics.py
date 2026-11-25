@@ -9,8 +9,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy.engine import Engine
 
 from insightflow.analytics import service
+from insightflow.analytics.question_provider import QuestionProvider
 from insightflow.analytics.registry import load_metrics
-from insightflow.api.deps import get_engine, get_org_context, get_settings_dep
+from insightflow.api.deps import (
+    get_engine,
+    get_org_context,
+    get_question_provider,
+    get_settings_dep,
+)
 from insightflow.core.context import OrgContext
 from insightflow.core.settings import Settings
 
@@ -21,6 +27,7 @@ Eng = Annotated[Engine, Depends(get_engine)]
 Cfg = Annotated[Settings, Depends(get_settings_dep)]
 From = Annotated[date | None, Query(alias="from")]
 To = Annotated[date | None, Query(alias="to")]
+Provider = Annotated[QuestionProvider | None, Depends(get_question_provider)]
 
 
 class QuestionRequest(BaseModel):
@@ -31,10 +38,22 @@ class QuestionRequest(BaseModel):
 
 @router.post("/datasets/{dataset_id}/questions")
 def ask_question(
-    dataset_id: uuid.UUID, body: QuestionRequest, ctx: Ctx, engine: Eng, settings: Cfg
+    dataset_id: uuid.UUID,
+    body: QuestionRequest,
+    ctx: Ctx,
+    engine: Eng,
+    settings: Cfg,
+    provider: Provider,
 ) -> dict[str, Any]:
     return service.answer_question(
-        ctx, engine, settings, dataset_id, body.question, body.from_date, body.to_date
+        ctx,
+        engine,
+        settings,
+        dataset_id,
+        body.question,
+        body.from_date,
+        body.to_date,
+        provider=provider,
     )
 
 
