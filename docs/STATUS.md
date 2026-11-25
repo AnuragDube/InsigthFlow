@@ -16,7 +16,7 @@ activation and broader natural-language interpretation remain open.
 
 | Ref | Evidence |
 |---|---|
-| Remote default and `m1-data-foundation` | `b796cb4`, including the M1 publication note |
+| Remote default and `m1-data-foundation` | `b796cb4`, recording the M1 publication from the owner's Windows environment |
 | `m2-dashboard` | `be8a16e`, eight commits after the shared base `950e869`. Adds metrics, API, SPA and CI coverage |
 | Audit | `audit/lead-engineering-2026-11-25`, based on M2. The M1-only publication note was reconciled here |
 | Reliability | `fix/m2-dashboard-reliability`, based on the audit branch |
@@ -41,8 +41,8 @@ and [prior roadmap](ROADMAP.md).
 | Frontend, Linux with Node 24.22.3 | No frontend | TypeScript passed. Vitest 13 passed across 3 files. Vite build passed, with a 686.17 kB minified JS chunk warning |
 | Playwright | No frontend | 2 passed in 8.3 s (desktop and phone). The proxy blocked the pinned Chrome download. A temporary configuration used installed Chromium 156.0.8078.79 |
 
-The Windows CI matrix is configured for Python. Windows 11 execution, hosted
-CI results, and PostgreSQL runtime validation were outside this Linux run. The existing PostgreSQL
+The Windows CI matrix is configured for Python. The owner's Windows 11 rehearsal and PostgreSQL
+runtime validation were outside this Linux run. The existing PostgreSQL
 16 migration spike and earlier UCI results are recorded in [spikes](spikes/README.md) and
 [Data Profile](DATA_PROFILE.md). A fresh Linux M2 run downloaded and verified the UCI archive, processed 1,067,371
 Silver input rows, published after all 9 checks passed, and returned 10 dashboard KPIs with the
@@ -80,7 +80,9 @@ published run ID.
   mypy (57 source files), and **4 browser tests in 20.9 s** using Node 22 and system Chromium.
   GitHub Actions run 45562356067 reported a Windows-only JavaScript MIME mismatch in pytest
   (135 passed, 1 failed). The SPA now explicitly serves JavaScript as `text/javascript`.
-  The local regression test simulates the Windows MIME mapping. Hosted Windows sign-off is pending.
+  The local regression test simulates the Windows MIME mapping. All four checks passed in GitHub
+  Actions run [45563919813](https://github.com/AnuragDube/InsigthFlow/actions/runs/45563919813),
+  including Windows backend pytest.
 
 - The validated provider interface is now in place. A provider receives metric descriptions and
   question text and can return a registered metric identifier. Dates are interpreted and
@@ -88,7 +90,7 @@ published run ID.
 - The follow-up evaluation checked all ten metrics, date-field equivalence, conflicting or invalid
   dates, and rejection of an unregistered metric from a stub provider. Linux checks passed with
   **136 backend tests in 27.09 s**, **15 frontend tests**, and **4 Playwright tests in 19.9 s**
-  on system Chromium. Ruff, mypy, TypeScript and the build passed. Windows remains unverified.
+  on system Chromium. Ruff, mypy, TypeScript and the build passed. The owner's Windows 11 rehearsal remains unverified.
 
 - Linux Python 3.12.14. Ruff lint and format passed (74 files formatted), mypy passed
   (55 source files), and pytest passed **129 tests in 24.04 s**.
