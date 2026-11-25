@@ -35,6 +35,18 @@ later regrant cannot reactivate an old session. Roles are looked up per request.
 local demo keeps these endpoints disabled. Live sign-in still requires a configured provider
 and validation of its identity proof.
 
+For a pilot provider that issues RFC 9068 JWT access tokens, construct
+`insightflow.api.access_tokens.AccessTokenResolver` with the HTTPS issuer URL, API audience,
+OAuth client ID, and trusted RSA public-key PEM, and pass it as `session_login_resolver`.
+The exchange uses `Authorization: Bearer …`, `X-InsightFlow-Workspace` with the requested
+workspace UUID, and the normal `X-InsightFlow-Client: web` header. The workspace selection is
+checked against stored membership. Token role claims carry no authority.
+
+The adapter verifies RS256 signatures, issuer, audience, client ID, required claims, access-token
+type, and a maximum one-hour token lifetime. Verification uses a pinned public key. Provider
+configuration, key rotation procedures, and the browser's interactive OAuth flow must be
+validated before activating the pilot. Application logout revokes the app session.
+
 | Phase | Posture | Allowed exposure |
 |---|---|---|
 | P0 (interview MVP) | No authentication. Single configured demo org. All other controls below that don't depend on identity are implemented, including localhost hardening (§1a). | **Localhost only** (binds `127.0.0.1`). Optional public demo only in `PUBLIC_DEMO_MODE=read_only`: uploads, document upload and pipeline triggers disabled; bundled data only; NL/RAG rate-limited. |
