@@ -21,7 +21,7 @@ export function Questions({ datasetId }: { datasetId: string }) {
   return (
     <>
       <h1 className="summary">Ask about your metrics.</h1>
-      <p className="hint">Ask a supported question or enter a dashboard metric name. Dates are optional.</p>
+      <p className="hint">Ask about a dashboard metric. Use the date fields or add “from YYYY-MM-DD to YYYY-MM-DD” to your question.</p>
       <div className="toolbar" aria-label="Example questions">
         {EXAMPLES.map((example) => (
           <button key={example} type="button" className="chip" onClick={() => setQuestion(example)}>

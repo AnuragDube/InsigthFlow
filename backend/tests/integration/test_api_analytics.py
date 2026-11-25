@@ -7,8 +7,11 @@ from datetime import date, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
+from insightflow.analytics import service
+from insightflow.analytics.question_provider import MetricOption
 from insightflow.api.app import create_app
 from insightflow.core.context import OrgContext
+from insightflow.core.errors import ValidationFailed
 from insightflow.core.settings import Settings
 from insightflow.domains.loader import load_domain_pack
 from insightflow.metadata.db import session_scope
@@ -199,7 +202,13 @@ def test_unknown_dataset_is_404(client: TestClient) -> None:
         ("  HOW  MUCH did we sell? ", "gross_revenue", 140.445, 1),
         ("How many orders did we have?", "orders", 7, 1),
         ("What was our net revenue?", "net_revenue", 133.495, 2),
+        ("what was the average order value?", "average_order_value", 140.445 / 7, 2),
+        ("How many units did we sell?", "units_sold", 60, 1),
+        ("active_customers", "active_customers", 4, 1),
+        ("How many new customers did we have?", "new_customers", 4, 1),
         ("Repeat customer rate", "repeat_customer_rate", 0.25, 1),
+        ("What was the return rate by value?", "return_rate_value", 6.95 / 140.445, 2),
+        ("What was the value of returns?", "returns_value", 6.95, 1),
     ],
 )
 def test_question_answers_use_published_metrics(
@@ -225,11 +234,18 @@ def test_questions_respect_date_bounds_and_decline_unsupported_requests(
     answer = client.post(path, json=gross, headers=H)
     assert answer.status_code == 200
     assert answer.json()["value"] == pytest.approx(50.805)
+    dated = {"question": "How much did we sell from 2010-12-04 to 2010-12-06?"}
+    natural = client.post(path, json=dated, headers=H)
+    assert natural.status_code == 200
+    assert natural.json() == answer.json()
     for body in (
         {"question": "How much did we sell in France?"},
         {"question": "Forecast next month's sales"},
         {"question": "x" * 241},
         {**gross, "to": "2009-12-06"},
+        {**dated, "to": "2010-12-06"},
+        {"question": "Gross revenue from 2010-11-31 to 2010-12-06"},
+        {"question": "Gross revenue from 2010-12-06 to 2010-12-01"},
     ):
         declined = client.post(path, json=body, headers=H)
         assert declined.status_code == 422
@@ -243,3 +259,32 @@ def test_questions_require_a_published_dataset(client: TestClient) -> None:
             f"/api/v1/datasets/{dataset}/questions", json={"question": "Orders"}, headers=H
         )
         assert response.status_code == expected
+
+
+def test_provider_cannot_override_registry_or_explicit_dates(settings: Settings) -> None:
+    engine, ctx, source_id = published_fixture_gold(settings)
+    from_date, to_date = date(2010, 12, 4), date(2010, 12, 6)
+
+    class StubProvider:
+        def __init__(self, metric: str) -> None:
+            self.metric = metric
+
+        def select_metric(self, question: str, options: tuple[MetricOption, ...]) -> str:
+            assert question == "What did we earn from sales?"
+            assert {entry.name for entry in options} >= {"gross_revenue", "orders"}
+            return self.metric
+
+    question = "What did we earn from sales?"
+    answer = service.answer_question(
+        ctx, engine, settings, source_id, question, from_date, to_date,
+        provider=StubProvider("gross_revenue"),
+    )  # fmt: skip
+    assert answer["value"] == pytest.approx(50.805)
+    assert answer["from"] == from_date
+    assert answer["to"] == to_date
+
+    with pytest.raises(ValidationFailed, match="outside the supported set"):
+        service.answer_question(
+            ctx, engine, settings, source_id, question, from_date, to_date,
+            provider=StubProvider("unregistered_metric"),
+        )  # fmt: skip

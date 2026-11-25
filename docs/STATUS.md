@@ -8,8 +8,8 @@ current application local and use public or synthetic demo data.
 
 **M3 offline foundation is implemented.** The Ask tab maps supported questions and metric names
 to the existing registry. It shows the value, applied date range, published run, parameterized SQL,
-and metric definition. Unsupported questions are declined. Date filters belong in the separate
-date inputs. Hosted model integration and arbitrary natural-language interpretation remain open.
+and metric definition. Unsupported questions are declined. Use the date fields or an ISO date
+range in the question. Hosted model integration and broader natural-language interpretation remain open.
 
 ## Branch and design review
 
@@ -70,6 +70,14 @@ published run ID.
   the prior publication and dashboard totals intact.
 
 ### M3 offline verification
+
+- The validated provider interface is now in place. A provider receives metric descriptions and
+  question text and can return a registered metric identifier. Dates are interpreted and
+  validated by the server. The running application selects its offline provider by default.
+- The follow-up evaluation checked all ten metrics, date-field equivalence, conflicting or invalid
+  dates, and rejection of an unregistered metric from a stub provider. Linux checks passed with
+  **136 backend tests in 27.09 s**, **15 frontend tests**, and **4 Playwright tests in 19.9 s**
+  on system Chromium. Ruff, mypy, TypeScript and the build passed. Windows remains unverified.
 
 - Linux Python 3.12.14. Ruff lint and format passed (74 files formatted), mypy passed
   (55 source files), and pytest passed **129 tests in 24.04 s**.

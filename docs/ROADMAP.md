@@ -57,8 +57,8 @@ M1 and M2 already exist. Rehearse the local M2 dashboard on Windows 11 with a fi
 then sign off the dashboard reliability work. Defer live model integration, RAG, and public
 deployment until after the interview. The phase plan below records the original scope.
 
-The M3 offline Ask tab evaluates supported questions against deterministic metrics. Next, expand
-offline evaluation and introduce a provider that can select only a validated metric and scope.
+The M3 offline Ask tab evaluates supported questions against all ten deterministic metrics.
+The validated provider interface selects a metric, and the server owns the date and data scope.
 Live-provider evaluation requires approved access and data-handling terms. Sequence private-pilot
 identity and isolation before customer data. Plan grounded document retrieval next
 if discovery shows demand. Introduce scikit-learn models only with a business baseline and

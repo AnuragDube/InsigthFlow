@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -19,6 +20,11 @@ from insightflow.analytics.compiler import (
     compute_metric_with_sql,
     compute_series,
 )
+from insightflow.analytics.question_provider import (
+    MetricOption,
+    OfflineQuestionProvider,
+    QuestionProvider,
+)
 from insightflow.analytics.registry import Metric, load_metrics
 from insightflow.core.context import OrgContext
 from insightflow.core.errors import NotFoundError, ValidationFailed
@@ -29,21 +35,11 @@ from insightflow.warehouse.engine import open_gold, open_gold_run
 
 DAILY_TREND_MAX_DAYS = 62
 MAX_ANALYTICS_DAYS = 3660
-
-# Whole-question aliases only. Additional clauses must not be silently ignored.
-QUESTION_ALIASES = {
-    "how much did we sell": "gross_revenue",
-    "what was our gross revenue": "gross_revenue",
-    "how many orders did we have": "orders",
-    "how many units did we sell": "units_sold",
-    "what was our net revenue": "net_revenue",
-    "what was the average order value": "average_order_value",
-    "how many active customers did we have": "active_customers",
-    "how many new customers did we have": "new_customers",
-    "what was the repeat customer rate": "repeat_customer_rate",
-    "what was the return rate by value": "return_rate_value",
-    "what was the value of returns": "returns_value",
-}
+_QUESTION_PERIOD = re.compile(
+    r"(.+?)\s+from\s+([0-9]{4}-[0-9]{2}-[0-9]{2})\s+to\s+"
+    r"([0-9]{4}-[0-9]{2}-[0-9]{2})\s*\??",
+    re.IGNORECASE,
+)
 
 
 def as_number(v: Value) -> float | int | None:
@@ -118,14 +114,27 @@ def answer_question(
     question: str,
     start: date | None,
     end: date | None,
+    *,
+    provider: QuestionProvider | None = None,
 ) -> dict[str, object]:
     with session_scope(engine) as session:
         source = DataSourceRepo(session).get(ctx, source_id)
         domain, run_id = source.domain, source.published_run_id
     metrics = load_metrics(domain)
-    normalized = " ".join(question.casefold().split()).removesuffix("?").rstrip()
-    labels = {metric.label.casefold(): metric.name for metric in metrics.values()}
-    name = QUESTION_ALIASES.get(normalized) or labels.get(normalized)
+    period = _QUESTION_PERIOD.fullmatch(question.strip())
+    if period:
+        if start is not None or end is not None:
+            raise ValidationFailed("Enter dates in the question or the date fields.")
+        question, from_text, to_text = period.groups()
+        try:
+            start, end = date.fromisoformat(from_text), date.fromisoformat(to_text)
+        except ValueError as exc:
+            raise ValidationFailed("Use valid calendar dates in YYYY-MM-DD format.") from exc
+    options = tuple(
+        MetricOption(metric.name, metric.label, metric.description) for metric in metrics.values()
+    )
+    selector = provider if provider is not None else OfflineQuestionProvider()
+    name = selector.select_metric(question, options)
     if name is None or name not in metrics:
         raise ValidationFailed(
             "This question is outside the supported set. Try a suggested question or metric name."
