@@ -17,6 +17,7 @@ test("first run: load sample data, watch it publish, read the dashboard", async 
 
   await expect(page.getByText("Published").first()).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("Share of input rows that could not be typed", { exact: false })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Workspace CSV storage" })).toContainText("of 5 GiB used");
   await page.getByRole("button", { name: "Load sample data", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Sample data is already loaded.");
 

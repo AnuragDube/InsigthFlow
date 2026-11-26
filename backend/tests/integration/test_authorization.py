@@ -68,6 +68,10 @@ def test_principal_scopes_reads_and_requires_editor_for_writes(settings: Setting
             headers=editor,
         )
         assert uploaded.status_code == 201
+        usage = "/api/v1/workspace/storage"
+        assert client.get(usage).status_code == 401
+        assert client.get(usage, headers=viewer).json()["retained_csv_bytes"] > 0
+        assert client.get(usage, headers=other).json()["retained_csv_bytes"] == 0
         batch = f"{ds}/ingestions/{uploaded.json()['ingestion']['id']}"
         run = f"/api/v1/pipeline-runs/{uploaded.json()['run_id']}"
         doc = client.post(

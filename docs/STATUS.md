@@ -58,6 +58,7 @@ PostgreSQL backup and live snapshots remain outside this increment.
 **M7 workspace CSV quota is implemented.** The default retained-upload quota is 5 GiB per
 workspace and can be changed through settings. Concurrent uploads serialize the final
 quota check. Same-dataset duplicates reuse their prior ingestion.
+The Data page reports retained CSV bytes and the configured quota for the current workspace.
 
 M5 Linux verification passed **152 backend tests in 25.34 s**, along with Ruff lint,
 formatting, and mypy. The authorization test covers all seven mutation routes and

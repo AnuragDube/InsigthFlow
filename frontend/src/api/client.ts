@@ -42,6 +42,8 @@ const json = (body: unknown): RequestInit => ({
 });
 
 export const api = {
+  workspaceStorage: () =>
+    request<{ retained_csv_bytes: number; limit_bytes: number }>("/workspace/storage"),
   sessionOptions: () => request<{ interactive: boolean }>("/session"),
   signOut: () => request<void>("/session", { method: "DELETE" }),
   inactivityBacktest: (id: string) => request<InactivityBacktest>(`/datasets/${id}/inactivity-backtest`),

@@ -55,3 +55,10 @@ export function formatDuration(ms: number | null): string {
   if (ms === null) return DASH;
   return ms < 1000 ? `${ms} ms` : `${roundTo(ms / 1000, 1)} s`;
 }
+
+export function formatBytes(bytes: number): string {
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  const exponent = Math.min(units.length - 1, bytes > 0 ? Math.floor(Math.log2(bytes) / 10) : 0);
+  const size = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 2 }).format(bytes / 1024 ** exponent);
+  return `${size} ${units[exponent]}`;
+}

@@ -17,7 +17,15 @@ from insightflow.api.authorization_code import AuthorizationCodeFlow
 from insightflow.api.background import run_in_background
 from insightflow.api.body_limit import BodySizeLimitMiddleware
 from insightflow.api.deps import IdentityResolver
-from insightflow.api.routers import analytics, datasets, documents, health, runs, sessions
+from insightflow.api.routers import (
+    analytics,
+    datasets,
+    documents,
+    health,
+    runs,
+    sessions,
+    workspace,
+)
 from insightflow.api.spa import SecurityHeadersMiddleware, mount_spa
 from insightflow.core.logging import configure_logging
 from insightflow.core.settings import Settings, get_settings
@@ -108,6 +116,7 @@ def create_app(
     app.include_router(analytics.router)
     app.include_router(documents.router)
     app.include_router(sessions.router)
+    app.include_router(workspace.router)
     if settings.frontend_dist is not None:
         mount_spa(app, settings.frontend_dist)  # last: catch-all for client-side routes
     return app
