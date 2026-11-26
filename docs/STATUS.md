@@ -45,6 +45,11 @@ customers. The rule flagged 1,130 customers, of whom 739 went on to make no purc
 Precision was 65.4%, recall was 49.7%, and the cohort inactivity rate was 57.6%.
 These numbers describe one historical window.
 
+**M7 ingestion hardening has started.** Reloading identical sample files avoids an
+unnecessary pipeline run. If ingestion already recorded pending work, a repeat request can
+still trigger it. CSV header validation reads at most 16,385 characters and rejects header
+lines over 16,384 characters through the normal validation response.
+
 M5 Linux verification passed **152 backend tests in 25.34 s**, along with Ruff lint,
 formatting, and mypy. The authorization test covers all seven mutation routes and
 cross-organization access to published analysis and documents.

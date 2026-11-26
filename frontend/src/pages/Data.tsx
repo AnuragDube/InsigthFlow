@@ -87,8 +87,11 @@ export function Data({ datasetId }: { datasetId: string }) {
   });
   const sample = useMutation({
     mutationFn: () => api.loadSample(datasetId),
-    onSuccess: () => {
-      setMessage({ kind: "ok", text: "Sample data loaded. Processing started." });
+    onSuccess: (result) => {
+      const text = result.run_id || result.rerun_queued
+        ? "Sample data loaded. Processing requested."
+        : "Sample data is already loaded.";
+      setMessage({ kind: "ok", text });
       refresh();
     },
     onError,
