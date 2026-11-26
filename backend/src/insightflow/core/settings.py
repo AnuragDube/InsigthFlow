@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     sample_dir: Path = Path("data/samples/uci")
     demo_org_slug: str = "demo"
     max_upload_mb: int = 200
+    max_workspace_upload_mb: int = Field(default=5120, ge=0)
     cors_origins: list[str] = ["http://localhost:5173"]
     trusted_hosts: list[str] = ["localhost", "127.0.0.1", "testserver"]
     # Interpolated into DuckDB SET statements, so the format is strictly validated.
