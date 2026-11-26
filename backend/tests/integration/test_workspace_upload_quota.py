@@ -36,6 +36,8 @@ def test_workspace_quota_preserves_publication_and_allows_duplicate(settings: Se
     settings = settings.model_copy(update={"max_workspace_upload_mb": 1})
     payload = _csv()
     with TestClient(create_app(settings)) as client:
+        usage = "/api/v1/workspace/storage"
+        assert client.get(usage).json() == {"retained_csv_bytes": 0, "limit_bytes": 1048576}
         first_id, second_id = [
             client.post("/api/v1/datasets", headers=H, json={"name": name}).json()["id"]
             for name in ("First", "Second")
@@ -52,6 +54,10 @@ def test_workspace_quota_preserves_publication_and_allows_duplicate(settings: Se
         dashboard = client.get(f"/api/v1/datasets/{first_id}/dashboard").raise_for_status().json()
         assert dashboard["freshness"]["run_id"] == first.json()["run_id"]
         assert client.get(f"/api/v1/datasets/{second_id}/ingestions").json()["items"] == []
+        assert client.get(usage).json() == {
+            "retained_csv_bytes": len(payload),
+            "limit_bytes": 1048576,
+        }
 
 
 def test_concurrent_datasets_cannot_exceed_workspace_quota(

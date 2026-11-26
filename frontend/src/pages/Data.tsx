@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import type { QualityResult, Run, RunStatus } from "../api/types";
-import { formatDuration, formatValue } from "../lib/format";
+import { formatBytes, formatDuration, formatValue } from "../lib/format";
 
 const STATUS_TEXT: Record<RunStatus, string> = {
   queued: "Waiting to start",
@@ -39,6 +39,7 @@ export function Data({ datasetId }: { datasetId: string }) {
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
+  const storage = useQuery({ queryKey: ["workspace-storage"], queryFn: api.workspaceStorage });
   const batches = useQuery({ queryKey: ["ingestions", datasetId], queryFn: () => api.ingestions(datasetId) });
   const runs = useQuery({
     queryKey: ["runs", datasetId],
@@ -65,12 +66,17 @@ export function Data({ datasetId }: { datasetId: string }) {
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["ingestions", datasetId] });
+    void qc.invalidateQueries({ queryKey: ["workspace-storage"] });
     void qc.invalidateQueries({ queryKey: ["runs", datasetId] });
     void qc.invalidateQueries({ queryKey: ["dashboard", datasetId] });
     void qc.invalidateQueries({ queryKey: ["datasets"] });
     setSelected(null);
   };
   const onError = (e: Error) => setMessage({ kind: "error", text: e.message });
+  const onUploadError = (e: Error) => {
+    onError(e);
+    void qc.invalidateQueries({ queryKey: ["workspace-storage"] });
+  };
 
   const upload = useMutation({
     mutationFn: (file: File) => api.upload(datasetId, file),
@@ -83,7 +89,7 @@ export function Data({ datasetId }: { datasetId: string }) {
       });
       refresh();
     },
-    onError,
+    onError: onUploadError,
   });
   const sample = useMutation({
     mutationFn: () => api.loadSample(datasetId),
@@ -94,7 +100,7 @@ export function Data({ datasetId }: { datasetId: string }) {
       setMessage({ kind: "ok", text });
       refresh();
     },
-    onError,
+    onError: onUploadError,
   });
   const toggle = useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) => api.setBatchActive(datasetId, id, active),
@@ -124,6 +130,15 @@ export function Data({ datasetId }: { datasetId: string }) {
 
       <section className="section">
         <h2>Add data</h2>
+        {storage.data && (
+          <div role="group" aria-label="Workspace CSV storage">
+            <p className="hint">
+              {formatBytes(storage.data.retained_csv_bytes)} of {formatBytes(storage.data.limit_bytes)} used
+              for retained CSV files across this workspace.
+            </p>
+          </div>
+        )}
+        {storage.isError && <p className="hint">Workspace CSV storage is unavailable.</p>}
         <p className="hint">
           CSV with columns Invoice, StockCode, Description, Quantity, InvoiceDate, Price, Customer ID, Country. Each
           upload is kept unchanged. Overlapping exports are reconciled while repeats within a batch are preserved.

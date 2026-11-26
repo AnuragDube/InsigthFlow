@@ -12,6 +12,7 @@ const run = {
 
 it("shows batches, runs and the quality report of the latest run", async () => {
   mockFetch((url) => {
+    if (url.endsWith("/workspace/storage")) return { body: { retained_csv_bytes: 2048, limit_bytes: 1048576 } };
     if (url.endsWith("/datasets/d1/ingestions"))
       return { body: { items: [{ id: "i1", original_name: "batch_a.csv", sha256: "x", size_bytes: 1200, row_count: 14, status: "stored", is_active: true, created_at: "2026-11-24T19:00:00" }] } };
     if (url.includes("/pipeline-runs?dataset_id=d1")) return { body: { items: [run] } };
@@ -24,10 +25,12 @@ it("shows batches, runs and the quality report of the latest run", async () => {
   expect(await screen.findByText("Blocked by quality checks")).toBeInTheDocument();
   expect(await screen.findByText("Share of rows that could not be typed.")).toBeInTheDocument();
   expect(screen.getByText("Failed")).toBeInTheDocument();
+  expect(await screen.findByRole("group", { name: "Workspace CSV storage" })).toHaveTextContent("2 KiB of 1 MiB used");
 });
 
 it("excludes a batch and sends the client header", async () => {
   const fetchMock = mockFetch((url, init) => {
+    if (url.endsWith("/workspace/storage")) return { body: { retained_csv_bytes: 10, limit_bytes: 1048576 } };
     if (url.endsWith("/datasets/d1/ingestions"))
       return { body: { items: [{ id: "i1", original_name: "bad.csv", sha256: "x", size_bytes: 10, row_count: 1, status: "stored", is_active: true, created_at: "2026-11-24T19:00:00" }] } };
     if (url.includes("/pipeline-runs?")) return { body: { items: [] } };

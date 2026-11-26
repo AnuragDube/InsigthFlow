@@ -135,7 +135,7 @@ def ingest_file(
     paths.tmp.mkdir(parents=True, exist_ok=True)
     tmp = paths.tmp / f"upload-{new_id()}.part"
     safe_name = Path(original_name).name[:255] or "upload.csv"  # display only, never a path
-    quota = settings.max_workspace_upload_mb * 1024 * 1024
+    quota = settings.workspace_upload_limit_bytes
     try:
         sha, size = _spool(src, tmp, settings.max_upload_mb * 1024 * 1024)
 

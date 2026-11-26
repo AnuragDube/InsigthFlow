@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     frontend_dist: Path | None = None  # built SPA (frontend/dist) served same-origin when set
     code_version: str = "dev"  # set to the git SHA in deployments (reproducibility)
 
+    @property
+    def workspace_upload_limit_bytes(self) -> int:
+        return self.max_workspace_upload_mb * 1024 * 1024
+
 
 @lru_cache
 def get_settings() -> Settings:
