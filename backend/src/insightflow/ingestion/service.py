@@ -34,6 +34,7 @@ from insightflow.warehouse.paths import OrgPaths, sql_literal
 
 log = logging.getLogger(__name__)
 _CHUNK = 1024 * 1024
+_MAX_HEADER_CHARS = 16_384
 
 
 @dataclass(frozen=True)
@@ -58,9 +59,11 @@ def _spool(src: BinaryIO, dest: Path, max_bytes: int) -> tuple[str, int]:
 def _read_header(path: Path) -> list[str]:
     try:
         with path.open(encoding="utf-8-sig", newline="") as f:
-            first = f.readline()
+            first = f.readline(_MAX_HEADER_CHARS + 1)
     except UnicodeDecodeError as exc:
         raise ValidationFailed("The file is not a UTF-8 text CSV.") from exc
+    if len(first) > _MAX_HEADER_CHARS:
+        raise ValidationFailed("The CSV header exceeds 16,384 characters.")
     if not first.strip() or "\x00" in first:
         raise ValidationFailed("The file is empty or not a CSV.")
     return [c.strip() for c in next(csv.reader(io.StringIO(first)))]

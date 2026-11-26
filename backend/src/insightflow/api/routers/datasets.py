@@ -24,7 +24,7 @@ from insightflow.core.settings import Settings
 from insightflow.ingestion.service import ingest_file
 from insightflow.metadata.db import session_scope
 from insightflow.metadata.repositories import AuditRepo, DataSourceRepo, IngestionRepo
-from insightflow.pipeline.service import request_run
+from insightflow.pipeline.service import request_pending_run, request_run
 
 router = APIRouter(prefix="/api/v1/datasets", tags=["datasets"])
 
@@ -94,9 +94,18 @@ def upload(
     return UploadOut(ingestion=ing, created=True, **queued.model_dump())
 
 
-@router.post("/{dataset_id}/load-sample", status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/{dataset_id}/load-sample",
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={200: {"model": RunRequestOut, "description": "Sample already loaded"}},
+)
 def load_sample(
-    dataset_id: uuid.UUID, tasks: BackgroundTasks, ctx: EditorCtx, engine: Eng, settings: Cfg
+    dataset_id: uuid.UUID,
+    tasks: BackgroundTasks,
+    response: Response,
+    ctx: EditorCtx,
+    engine: Eng,
+    settings: Cfg,
 ) -> RunRequestOut:
     with session_scope(engine) as session:
         DataSourceRepo(session).get(ctx, dataset_id)
@@ -109,7 +118,14 @@ def load_sample(
     for path in files:
         with path.open("rb") as f:
             ingest_file(ctx, engine, settings, dataset_id, f, path.name)
-    return _queue(ctx, engine, settings, tasks, dataset_id, "sample")
+    run, rerun_queued = request_pending_run(
+        ctx, engine, dataset_id, trigger="sample", code_version=settings.code_version
+    )
+    if run is not None:
+        tasks.add_task(run_in_background, ctx, engine, settings, run.id)
+    elif not rerun_queued:
+        response.status_code = status.HTTP_200_OK
+    return RunRequestOut(run_id=run.id if run else None, rerun_queued=rerun_queued)
 
 
 @router.patch("/{dataset_id}/ingestions/{ingestion_id}")

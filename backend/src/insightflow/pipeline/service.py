@@ -95,6 +95,21 @@ def request_run(
         return RunRepo(s).create_queued(ctx, source_id, trigger=trigger, code_version=code_version)
 
 
+def request_pending_run(
+    ctx: OrgContext, engine: Engine, source_id: uuid.UUID, *, trigger: str, code_version: str
+) -> tuple[PipelineRun | None, bool]:
+    """Schedule work recorded by ingestion, preserving an active run's follow-up marker."""
+    with session_scope(engine) as session:
+        source = DataSourceRepo(session).lock(ctx, source_id)
+        if source.rerun_requested_at is None:
+            return None, False
+        runs = RunRepo(session)
+        if runs.active_for_source(ctx, source_id) is not None:
+            return None, True
+        source.rerun_requested_at = None
+        return runs.create_queued(ctx, source_id, trigger=trigger, code_version=code_version), False
+
+
 # --------------------------------------------------------------------------- executing runs
 
 

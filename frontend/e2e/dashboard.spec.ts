@@ -17,6 +17,8 @@ test("first run: load sample data, watch it publish, read the dashboard", async 
 
   await expect(page.getByText("Published").first()).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("Share of input rows that could not be typed", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Load sample data", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Sample data is already loaded.");
 
   await overview.click();
   // batch_b fixture: 15.30 + 18.50 + 19.50 + 19.50 + 2.95 = £75.75 across 4 invoices.

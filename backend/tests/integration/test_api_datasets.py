@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import uuid
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from insightflow.api.app import create_app
 from insightflow.core.settings import Settings
+from insightflow.ingestion.service import ingest_file
 from pipeline_helpers import FIX
 
 H = {"X-InsightFlow-Client": "web"}
@@ -143,6 +145,41 @@ def test_load_sample_ingests_and_runs(client: TestClient, settings: Settings) ->
     assert client.get(f"/api/v1/pipeline-runs/{r.json()['run_id']}").json()["status"] == (
         "succeeded"
     )
+    repeat = client.post(f"/api/v1/datasets/{ds}/load-sample", headers=H)
+    assert repeat.status_code == 200
+    assert repeat.json() == {"run_id": None, "rerun_queued": False}
+    runs = client.get("/api/v1/pipeline-runs", params={"dataset_id": ds}).json()["items"]
+    assert len(runs) == 1
+
+
+def test_repeat_sample_load_recovers_recorded_pending_work(
+    client: TestClient, settings: Settings
+) -> None:
+    settings.sample_dir.mkdir(parents=True)
+    sample = settings.sample_dir / "Year_2010-2011.csv"
+    shutil.copy(FIX / "batch_b.csv", sample)
+    ds = _dataset(client)
+    app = client.app
+    with sample.open("rb") as file:
+        result = ingest_file(
+            app.state.demo_ctx, app.state.engine, settings, uuid.UUID(ds), file, sample.name
+        )
+    assert result.created
+    repeat = client.post(f"/api/v1/datasets/{ds}/load-sample", headers=H)
+    assert repeat.status_code == 202
+    run = client.get(f"/api/v1/pipeline-runs/{repeat.json()['run_id']}")
+    assert run.json()["status"] == "succeeded"
+
+
+def test_oversized_csv_header_returns_validation_error(client: TestClient) -> None:
+    ds = _dataset(client)
+    response = client.post(
+        f"/api/v1/datasets/{ds}/uploads",
+        files={"file": ("oversized.csv", b"x" * 16385 + b"\nvalue\n")},
+        headers=H,
+    )
+    assert response.status_code == 422
+    assert "header exceeds 16,384 characters" in response.json()["detail"]
 
 
 def test_load_sample_without_files_explains_how_to_fetch(client: TestClient) -> None:
