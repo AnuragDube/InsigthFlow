@@ -45,8 +45,13 @@ def _queue(
     tasks: BackgroundTasks,
     source_id: uuid.UUID,
     trigger: str,
+    *,
+    audit_rebuild: bool = False,
 ) -> RunRequestOut:
-    run = request_run(ctx, engine, source_id, trigger=trigger, code_version=settings.code_version)
+    run = request_run(
+        ctx, engine, source_id, trigger=trigger,
+        code_version=settings.code_version, audit_rebuild=audit_rebuild,
+    )  # fmt: skip
     if run is None:
         return RunRequestOut(run_id=None, rerun_queued=True)
     tasks.add_task(run_in_background, ctx.org_id, engine, settings, run.id)
@@ -157,4 +162,4 @@ def change_ingestion(
 def trigger_run(
     dataset_id: uuid.UUID, tasks: BackgroundTasks, ctx: EditorCtx, engine: Eng, settings: Cfg
 ) -> RunRequestOut:
-    return _queue(ctx, engine, settings, tasks, dataset_id, "manual")
+    return _queue(ctx, engine, settings, tasks, dataset_id, "manual", audit_rebuild=True)

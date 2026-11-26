@@ -207,6 +207,16 @@ by workspace and issuer. Treat actor references as workspace metadata. A party w
 identity tuple can recompute the digest. The localhost demo remains anonymous and pipeline
 completion stays a system event. Existing records retain their original attribution.
 
+An explicit rebuild records `pipeline.rebuild_requested` in the same transaction as the queue
+change. The event targets the dataset and includes the new run ID when available. A request
+coalesced into a follow-up records `coalesced=true` and `run_id=null` because the runner assigns
+the follow-up ID later. The original audit entry is kept as written.
+Local membership grants, role changes, and revocations record `workspace.membership_changed` in the
+membership transaction. These events identify the affected member by the same digest, include the
+old and new roles, and use the system actor category because the local operator has no app identity.
+Repeated commands that leave the role unchanged produce no event. Denied requests remain outside
+the current audit coverage.
+
 ## 11. Safe error messages
 - Domain errors → stable `type` URIs (`/errors/quality-gate-failed`, `/errors/sql-rejected`) with human text.
 - Unexpected errors → 500 "Something went wrong" + correlation id; full trace server-side only.

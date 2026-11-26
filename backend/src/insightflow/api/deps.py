@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated
@@ -77,9 +75,5 @@ def get_org_context(principal: Authenticated) -> OrgContext:
 def get_editor_context(principal: Authenticated) -> OrgContext:
     if principal.role not in {"owner", "editor"}:
         raise ForbiddenError("This action requires an editor or owner role.")
-    if principal.identity is None:
-        return OrgContext(principal.org_id)
-    identity = principal.identity
-    # The workspace and issuer namespace the subject. Store no raw provider identifiers.
-    actor = json.dumps([str(principal.org_id), identity.issuer, identity.subject])
-    return OrgContext(principal.org_id, hashlib.sha256(actor.encode("utf-8")).hexdigest())
+    actor_ref = principal.identity.audit_ref() if principal.identity else None
+    return OrgContext(principal.org_id, actor_ref)

@@ -79,6 +79,7 @@ def request_run(
     *,
     trigger: str,
     code_version: str = "dev",
+    audit_rebuild: bool = False,
 ) -> PipelineRun | None:
     """Queue a run, or — if one is already active — leave the durable re-run marker set.
 
@@ -88,11 +89,25 @@ def request_run(
     """
     with session_scope(engine) as s:
         source = DataSourceRepo(s).lock(ctx, source_id)
-        if RunRepo(s).active_for_source(ctx, source_id) is not None:
+        runs = RunRepo(s)
+        if runs.active_for_source(ctx, source_id) is not None:
             source.rerun_requested_at = _now()
-            return None
-        source.rerun_requested_at = None
-        return RunRepo(s).create_queued(ctx, source_id, trigger=trigger, code_version=code_version)
+            run = None
+        else:
+            source.rerun_requested_at = None
+            run = runs.create_queued(ctx, source_id, trigger=trigger, code_version=code_version)
+        if audit_rebuild:
+            AuditRepo(s).record(
+                ctx,
+                action="pipeline.rebuild_requested",
+                target_type="dataset",
+                target_id=source_id,
+                details={
+                    "run_id": str(run.id) if run is not None else None,
+                    "coalesced": run is None,
+                },
+            )
+        return run
 
 
 def request_pending_run(

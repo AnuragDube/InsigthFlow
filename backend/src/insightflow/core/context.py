@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
 from dataclasses import dataclass
 from typing import Literal
@@ -27,3 +29,8 @@ class VerifiedIdentity:
     issuer: str
     subject: str
     org_id: uuid.UUID
+
+    def audit_ref(self) -> str:
+        """Pseudonymous reference shared by request and membership audit events."""
+        actor = json.dumps([str(self.org_id), self.issuer, self.subject])
+        return hashlib.sha256(actor.encode("utf-8")).hexdigest()

@@ -28,12 +28,13 @@ connecting a live provider, then verifying sign-in against that provider, remain
 
 **M7 pilot audit attribution is implemented for existing mutation events.** Dataset creation,
 CSV ingestion and validation failures recorded by ingestion, batch toggles, and document uploads
-and deletions carry a workspace-scoped actor reference in authenticated mode. Pipeline completion
-is recorded as a system event. Coverage for denied requests, explicit rebuild requests, and
-membership changes remains open. See [Audit logging](SECURITY.md#10-audit-logging).
-Linux verification on Python 3.12.14 passed **165 tests in 39.71 s**, with Ruff lint and
-formatting and mypy passing. Integration checks cover different workspace references for the same
-provider account, stable attribution across cookie renewal, and system-owned pipeline completion.
+and deletions carry a workspace-scoped actor reference in authenticated mode. Explicit rebuild
+requests record whether a run was queued immediately or coalesced into a follow-up. Pipeline
+completion and local membership grants, changes, and revocations use system attribution. Denied
+requests remain outside the current coverage. See [Audit logging](SECURITY.md#10-audit-logging).
+Linux verification on Python 3.12.14 passed **165 tests in 40.45 s**, with Ruff lint and
+formatting and mypy passing. Integration coverage includes workspace-scoped references, session
+renewal, normal and coalesced rebuild requests, and idempotent local role changes.
 
 **M6 forecasting baseline is implemented.** The Forecast tab compares the previous-week
 seasonal baseline with a four-week matching-weekday average for the next seven days of gross
@@ -197,7 +198,7 @@ published run ID.
 | Implemented | FastAPI liveness/readiness, typed settings, correlated problem responses, SQLite/Alembic, basic system audit events, e-commerce CSV ingestion, batch toggles, run and quality APIs. |
 | Implemented | Bronze raw CSV, all-text Parquet, hash and manifest. Silver typing, quarantine, adjustments and overlap handling. Gold sales/returns facts, dimensions and daily aggregates. Gated publication, run inputs and stage records, retry coalescing, startup recovery and pruning. |
 | Implemented on M2 | Ten metric definitions, parameterized dashboard/series/breakdown queries, React Overview and Data pages, same-origin SPA with CSP, keyboard-accessible controls designed into the UI. Desktop/phone projects cover the fixture-backed publish path. |
-| Partial | Organization-scoped repositories and composite keys operate under one demo org. PostgreSQL compatibility has spike evidence. Pipeline execution and recovery assume one server process. Basic audit trail lacks authenticated actor identity. |
+| Partial | Organization-scoped repositories support the demo and opt-in pilot authentication. PostgreSQL compatibility has spike evidence. One server process owns pipeline execution and recovery. The audit trail covers selected writes, with denial logging pending. |
 | Missing | Auth and RBAC, enforced public read-only demo mode, PostgreSQL application CI and tenant RLS, scheduled jobs and operational alerts, NL-to-SQL, ADR-0009’s Gold metric views and provider abstraction, RAG/document citations, connectors, ML, billing and commercial operations. |
 
 ## Pipeline and quality assessment

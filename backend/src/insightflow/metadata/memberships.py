@@ -5,9 +5,10 @@ from __future__ import annotations
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from insightflow.core.context import Role, VerifiedIdentity
+from insightflow.core.context import OrgContext, Role, VerifiedIdentity
 from insightflow.core.errors import NotFoundError, ValidationFailed
 from insightflow.metadata.models import Organization, WorkspaceMembership
+from insightflow.metadata.repositories import AuditRepo
 
 
 def role_for(session: Session, identity: VerifiedIdentity) -> Role | None:
@@ -40,9 +41,12 @@ def set_role(session: Session, identity: VerifiedIdentity, role: Role | None) ->
     membership = session.get(
         WorkspaceMembership, (identity.org_id, identity.issuer, identity.subject)
     )
+    previous_role = membership.role if membership is not None else None
+    if previous_role == role:
+        return
     if role is None:
-        if membership is not None:
-            session.delete(membership)
+        assert membership is not None
+        session.delete(membership)
     elif membership is None:
         session.add(
             WorkspaceMembership(
@@ -51,3 +55,14 @@ def set_role(session: Session, identity: VerifiedIdentity, role: Role | None) ->
         )
     else:
         membership.role = role
+    AuditRepo(session).record(
+        OrgContext(identity.org_id),
+        action="workspace.membership_changed",
+        actor_type="system",
+        target_type="workspace_membership",
+        details={
+            "member_ref": identity.audit_ref(),
+            "previous_role": previous_role,
+            "role": role,
+        },
+    )

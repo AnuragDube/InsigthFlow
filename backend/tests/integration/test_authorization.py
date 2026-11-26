@@ -7,12 +7,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from insightflow.api.app import create_app
-from insightflow.core.context import VerifiedIdentity
+from insightflow.core.context import OrgContext, VerifiedIdentity
 from insightflow.core.settings import Settings
 from insightflow.metadata.bootstrap import ensure_org
 from insightflow.metadata.db import session_scope
 from insightflow.metadata.memberships import set_role
 from insightflow.metadata.models import AuditEvent, Organization
+from insightflow.pipeline.service import request_run
 from pipeline_helpers import FIX
 
 H = {"X-InsightFlow-Client": "web"}
@@ -127,11 +128,22 @@ def test_principal_scopes_reads_and_requires_editor_for_writes(settings: Setting
         assert invalid.status_code == 422
         assert client.post(DATASETS, json={"name": "Only second"}, headers=other).status_code == 201
 
+        rebuilt = client.post(f"{ds}/pipeline-runs", headers=editor)
+        assert rebuilt.status_code == 202
+        dataset_id = uuid.UUID(created.json()["id"])
+        assert request_run(OrgContext(first), app.state.engine, dataset_id, trigger="manual")
+        coalesced = client.post(f"{ds}/pipeline-runs", headers=editor)
+        assert coalesced.status_code == 202
+        assert coalesced.json() == {"run_id": None, "rerun_queued": True}
+        assert client.post(f"{ds}/pipeline-runs", headers=other).status_code == 404
+
         with session_scope(app.state.engine) as session:
+            set_role(session, identities["editor"], "viewer")
             set_role(session, identities["editor"], "viewer")
         assert client.post(DATASETS, headers=editor, json={"name": "Denied"}).status_code == 403
         assert client.get(DATASETS, headers=editor).status_code == 200
         with session_scope(app.state.engine) as session:
+            set_role(session, identities["editor"], None)
             set_role(session, identities["editor"], None)
         assert client.get(DATASETS, headers=editor).status_code == 403
         assert client.get(DATASETS, headers=other).status_code == 200
@@ -141,24 +153,61 @@ def test_principal_scopes_reads_and_requires_editor_for_writes(settings: Setting
             user_events = [event for event in events if event.actor_type == "user"]
             refs = {event.details["actor_ref"] for event in user_events}
             assert len(refs) == 1
-            assert len(user_events) == 5
+            assert len(user_events) == 7
             assert {(event.action, event.outcome) for event in user_events} == {
                 ("dataset.create", "success"),
                 ("dataset.upload", "success"),
                 ("dataset.upload", "error"),
                 ("document.upload", "success"),
                 ("document.delete", "success"),
+                ("pipeline.rebuild_requested", "success"),
             }
             deletion = next(event for event in user_events if event.action == "document.delete")
             assert deletion.correlation_id == deleted.headers["X-Correlation-ID"]
             assert deletion.target_id == uuid.UUID(doc.json()["id"])
             assert deletion.details == {"actor_ref": next(iter(refs))}
-            system_events = [event for event in events if event.action == "pipeline.run"]
-            assert len(system_events) == 1
-            assert system_events[0].actor_type == "system"
-            assert "actor_ref" not in system_events[0].details
+            rebuilds = {
+                event.correlation_id: event
+                for event in user_events
+                if event.action == "pipeline.rebuild_requested"
+            }
+            accepted = rebuilds[rebuilt.headers["X-Correlation-ID"]]
+            follow_up = rebuilds[coalesced.headers["X-Correlation-ID"]]
+            assert accepted.target_id == follow_up.target_id == dataset_id
+            actor_ref = next(iter(refs))
+            assert accepted.details == {
+                "actor_ref": actor_ref,
+                "coalesced": False,
+                "run_id": rebuilt.json()["run_id"],
+            }
+            assert follow_up.details == {"actor_ref": actor_ref, "coalesced": True, "run_id": None}
+            completions = [event for event in events if event.action == "pipeline.run"]
+            assert len(completions) == 2
+            assert all(
+                e.actor_type == "system" and "actor_ref" not in e.details for e in completions
+            )
+            membership_changes = [
+                event
+                for event in events
+                if event.action == "workspace.membership_changed"
+                and event.details["member_ref"] == actor_ref
+            ]
+            assert len(membership_changes) == 3
+            assert all(
+                event.actor_type == "system" and "actor_ref" not in event.details
+                for event in membership_changes
+            )
+            assert {
+                (e.details["previous_role"], e.details["role"]) for e in membership_changes
+            } == {
+                (None, "editor"),
+                ("editor", "viewer"),
+                ("viewer", None),
+            }
             second_event = session.scalars(
-                select(AuditEvent).where(AuditEvent.org_id == second)
+                select(AuditEvent).where(
+                    AuditEvent.org_id == second, AuditEvent.actor_type == "user"
+                )
             ).one()
             assert second_event.actor_type == "user"
             assert second_event.details["actor_ref"] not in refs

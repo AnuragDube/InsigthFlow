@@ -70,7 +70,9 @@ def test_browser_session_exchange_lifecycle(settings: Settings) -> None:
         assert client.post(DATASETS, headers=H, json={"name": "Second dataset"}).status_code == 201
         with session_scope(app.state.engine) as session:
             events = session.scalars(
-                select(AuditEvent).where(AuditEvent.org_id == org.org_id)
+                select(AuditEvent).where(
+                    AuditEvent.org_id == org.org_id, AuditEvent.action == "dataset.create"
+                )
             ).all()
             assert [event.actor_type for event in events] == ["user", "user"]
             assert len({event.details["actor_ref"] for event in events}) == 1
