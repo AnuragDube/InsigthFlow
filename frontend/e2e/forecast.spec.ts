@@ -29,4 +29,5 @@ test("forecast shows two methods and their historical errors", async ({ page }, 
   await expect(page.getByRole("heading", { name: "Customer segments" })).toBeVisible();
   const repeat = page.getByRole("row").filter({ hasText: "Recent repeat" });
   await expect(repeat).toContainText("£70.00");
+  await expect(page.getByText("This backtest requires at least 120 calendar days of history.")).toBeVisible();
 });

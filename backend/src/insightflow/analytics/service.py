@@ -21,6 +21,7 @@ from insightflow.analytics.compiler import (
     compute_series,
 )
 from insightflow.analytics.forecast import MAX_HISTORY, forecast_week
+from insightflow.analytics.inactivity import evaluate_recency
 from insightflow.analytics.question_provider import (
     MetricOption,
     OfflineQuestionProvider,
@@ -332,3 +333,14 @@ def customer_segments(
         "unit": "GBP",
         "segments": segments,
     }
+
+
+def inactivity_backtest(
+    ctx: OrgContext, engine: Engine, settings: Settings, source_id: uuid.UUID
+) -> dict[str, object]:
+    with session_scope(engine) as session:
+        run_id = DataSourceRepo(session).get(ctx, source_id).published_run_id
+    with open_gold_run(ctx, settings, source_id, run_id) as con:
+        bounds = _resolve(con, None, None)
+        evaluation = evaluate_recency(con, bounds.min, bounds.end)
+    return {"published_run_id": run_id, "evaluation": evaluation}
