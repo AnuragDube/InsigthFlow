@@ -97,6 +97,37 @@ Indicative production stack later (paid, not chosen now): managed container plat
 object storage, a contracted LLM provider. Revisit costs when there is revenue validation.
 
 ## 7. Operational notes
+
+### SQLite workspace backup and restore
+
+Let running pipeline work finish, then stop InsightFlow before copying the workspace. The
+backup combines the SQLite metadata with the file warehouse, so both must stay stable during
+the copy. Run these commands from the repository root with the application's
+`INSIGHTFLOW_DATABASE_URL` and `INSIGHTFLOW_DATA_DIR` settings.
+
+```powershell
+uv run --frozen python scripts/backup_workspace.py backup ./workspace-backup
+uv run --frozen python scripts/backup_workspace.py restore ./workspace-backup ./restored-workspace
+```
+
+Choose new directories outside the source workspace data directory. Keep backups private
+because they include uploaded data, documents, and database records. An interrupted backup
+is usable only if it has a complete manifest and passes verification.
+Restored users sign in again. The backup copy omits browser sessions.
+
+To test the restored copy without changing the original, set separate paths before starting
+the application:
+
+```powershell
+$restore = (Resolve-Path ./restored-workspace).Path.Replace('\', '/')
+$env:INSIGHTFLOW_DATA_DIR = "$restore/data"
+$env:INSIGHTFLOW_DATABASE_URL = "sqlite:///$restore/metadata.sqlite3"
+```
+
+Start the app and check readiness, open a published dashboard, and confirm that expected
+documents are present. Restore verifies SHA-256 file hashes and SQLite integrity and refuses to
+overwrite an existing directory. The command expects a trusted SQLite backup and a single
+stopped instance. Keep the original workspace until the restored copy has been inspected.
 - Secrets set only in host dashboards; never in images or repo. Rotate Groq key if exposed: revoke in console,
   update host env, redeploy.
 - `PUBLIC_DEMO_MODE=read_only` is required for any public URL in P0 (enforced at startup: app refuses to bind

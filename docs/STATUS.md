@@ -50,6 +50,11 @@ unnecessary pipeline run. If ingestion already recorded pending work, a repeat r
 still trigger it. CSV header validation reads at most 16,385 characters and rejects header
 lines over 16,384 characters through the normal validation response.
 
+**M7 SQLite backup and restore is implemented.** A local operator can snapshot a stopped
+workspace, verify the copied database, and restore it into a fresh directory. The restore
+smoke test reads the same published dashboard and documents from the restored workspace.
+PostgreSQL backup and live snapshots remain outside this increment.
+
 M5 Linux verification passed **152 backend tests in 25.34 s**, along with Ruff lint,
 formatting, and mypy. The authorization test covers all seven mutation routes and
 cross-organization access to published analysis and documents.
