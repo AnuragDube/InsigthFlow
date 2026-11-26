@@ -7,6 +7,7 @@ import { KpiLedger } from "../components/KpiLedger";
 import { Provenance } from "../components/Provenance";
 import { RankedList } from "../components/RankedList";
 import { TrendChart } from "../components/TrendChart";
+import { downloadDashboardKpis } from "../lib/dashboardCsv";
 import { formatDate, formatDateRange, formatValue } from "../lib/format";
 
 type Preset = "all" | "12m" | "3m" | "30d";
@@ -140,6 +141,9 @@ export function Overview({ datasetId, onOpenData }: { datasetId: string; onOpenD
             onChange={(e) => e.target.value && (setPreset("all"), setRange({ from: d.range.from, to: e.target.value }))}
           />
         </label>
+        <button type="button" className="btn quiet" disabled={q.isPlaceholderData} onClick={() => downloadDashboardKpis(d)}>
+          Download KPI CSV
+        </button>
       </div>
 
       <Provenance freshness={d.freshness} onOpenData={onOpenData} />
