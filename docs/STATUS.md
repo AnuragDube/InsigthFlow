@@ -60,6 +60,11 @@ workspace and can be changed through settings. Concurrent uploads serialize the 
 quota check. Same-dataset duplicates reuse their prior ingestion.
 The Data page reports retained CSV bytes and the configured quota for the current workspace.
 
+**M8 display currency is implemented.** The Overview, Ask, Forecast, and Customers
+tabs share a browser preference for GBP, USD, EUR, or INR. Non-GBP displays require a
+user-entered rate per pound. The same rate applies across the displayed date range.
+Canonical reports, dataset history, SQL, and quality rules remain denominated in GBP.
+
 M5 Linux verification passed **152 backend tests in 25.34 s**, along with Ruff lint,
 formatting, and mypy. The authorization test covers all seven mutation routes and
 cross-organization access to published analysis and documents.

@@ -25,9 +25,22 @@ test("forecast shows two methods and their historical errors", async ({ page }, 
   await expect(page.getByRole("table").getByRole("row")).toHaveCount(8);
   await expect(page.getByText(/Mean absolute error over 7 held-out days/)).toBeVisible();
 
+  await page.getByText("Display currency (GBP)", { exact: true }).click();
+  await page.getByRole("combobox", { name: "Display currency", exact: true }).selectOption("USD");
+  await expect(page.getByRole("button", { name: "Apply currency" })).toBeDisabled();
+  await page.getByRole("spinbutton", { name: "1 GBP in USD" }).fill("2");
+  await page.getByRole("button", { name: "Apply currency" }).click();
+  await expect(page.getByRole("row").nth(1)).toContainText("USD 4.00");
+  await page.reload();
+  await expect(page.getByRole("row").nth(1)).toContainText("USD 4.00");
+
   await page.getByRole("button", { name: "Customers", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Customer segments" })).toBeVisible();
   const repeat = page.getByRole("row").filter({ hasText: "Recent repeat" });
+  await expect(repeat).toContainText("USD 140.00");
+  await page.getByText("Display currency (USD, manual rate)", { exact: true }).click();
+  await page.getByRole("combobox", { name: "Display currency", exact: true }).selectOption("GBP");
+  await page.getByRole("button", { name: "Apply currency" }).click();
   await expect(repeat).toContainText("£70.00");
   await expect(page.getByText("This backtest requires at least 120 calendar days of history.")).toBeVisible();
 });

@@ -1,3 +1,4 @@
+import { useCurrency } from "../lib/currency";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Dashboard } from "../api/types";
 import { formatDate, formatExact, formatValue } from "../lib/format";
@@ -11,6 +12,7 @@ function tick(period: string, grain: "day" | "month"): string {
 }
 
 export function TrendChart({ trend }: { trend: Dashboard["trend"] }) {
+  const currency = useCurrency();
   const total = trend.points.reduce((s, p) => s + (p.value ?? 0), 0);
   const peak = trend.points.reduce<{ period: string; value: number } | null>(
     (best, p) => (p.value !== null && (!best || p.value > best.value) ? { period: p.period, value: p.value } : best),
@@ -29,13 +31,13 @@ export function TrendChart({ trend }: { trend: Dashboard["trend"] }) {
             minTickGap={24}
           />
           <YAxis
-            tickFormatter={(v: number) => formatValue(v, "GBP")}
+            tickFormatter={(v: number) => formatValue(v, "GBP", currency)}
             stroke="var(--ink-faint)"
             fontSize={12}
             width={64}
           />
           <Tooltip
-            formatter={(v) => [formatExact(Number(v), "GBP"), "Gross revenue"]}
+            formatter={(v) => [formatExact(Number(v), "GBP", currency), "Gross revenue"]}
             labelFormatter={(p) => formatDate(String(p))}
             contentStyle={{ background: "var(--surface)", border: "1px solid var(--rule)" }}
           />
@@ -50,8 +52,8 @@ export function TrendChart({ trend }: { trend: Dashboard["trend"] }) {
         </AreaChart>
       </ResponsiveContainer>
       <figcaption className="visually-hidden">
-        Gross revenue by {trend.grain}: {trend.points.length} points totalling {formatExact(total, "GBP")}
-        {peak ? `, highest ${formatExact(peak.value, "GBP")} on ${formatDate(peak.period)}` : ""}.
+        Gross revenue by {trend.grain}: {trend.points.length} points totalling {formatExact(total, "GBP", currency)}
+        {peak ? `, highest ${formatExact(peak.value, "GBP", currency)} on ${formatDate(peak.period)}` : ""}.
       </figcaption>
     </figure>
   );

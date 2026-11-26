@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { CurrencyPicker } from "./components/CurrencyPicker";
+import { CurrencyContext, readCurrency, saveCurrency } from "./lib/currency";
 import { ApiError, api } from "./api/client";
 import type { Dataset, Page } from "./api/types";
 import { Customers } from "./pages/Customers";
@@ -77,6 +79,7 @@ export function App() {
   });
   const signInRequired =
     session.data?.interactive && datasets.error instanceof ApiError && datasets.error.status === 401;
+  const [currency, setCurrency] = useState(readCurrency);
   const [tab, setTab] = useState<Tab>(tabFromHash);
   const [chosen, setChosen] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -197,10 +200,20 @@ export function App() {
           />
         )}
         {tab === "documents" && <Documents />}
-        {current && tab === "overview" && <Overview key={current.id} datasetId={current.id} onOpenData={() => go("data")} />}
-        {current && tab === "customers" && <Customers key={current.id} datasetId={current.id} runId={current.published_run_id} />}
-        {current && tab === "forecast" && <Forecast key={current.id} datasetId={current.id} runId={current.published_run_id} />}
-        {current && tab === "questions" && <Questions key={current.id} datasetId={current.id} />}
+        <CurrencyContext.Provider value={currency}>
+          {current && tab !== "data" && tab !== "documents" && (
+            <div className="toolbar">
+              <CurrencyPicker value={currency} onApply={(preference) => {
+                setCurrency(preference);
+                saveCurrency(preference);
+              }} />
+            </div>
+          )}
+          {current && tab === "overview" && <Overview key={current.id} datasetId={current.id} onOpenData={() => go("data")} />}
+          {current && tab === "customers" && <Customers key={current.id} datasetId={current.id} runId={current.published_run_id} />}
+          {current && tab === "forecast" && <Forecast key={current.id} datasetId={current.id} runId={current.published_run_id} />}
+          {current && tab === "questions" && <Questions key={current.id} datasetId={current.id} />}
+        </CurrencyContext.Provider>
         {current && tab === "data" && (
           <>
             {creating ? (

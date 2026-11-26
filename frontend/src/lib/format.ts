@@ -1,3 +1,6 @@
+import { BASE_CURRENCY } from "./currency";
+import type { CurrencyPreference } from "./currency";
+
 export type Unit = "GBP" | "count" | "ratio";
 
 const DASH = "—";
@@ -21,17 +24,26 @@ function money(v: number): string {
   return `${sign}£${pence.format(roundTo(a, 2))}`;
 }
 
-export function formatValue(value: number | null, unit: Unit): string {
+function converted(value: number, currency: CurrencyPreference, compact: boolean): string {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: currency.code,
+    currencyDisplay: "code",
+    ...(compact && Math.abs(value * currency.rate) >= 10_000 ? { notation: "compact" } : {}),
+  }).format(value * currency.rate);
+}
+
+export function formatValue(value: number | null, unit: Unit, currency: CurrencyPreference = BASE_CURRENCY): string {
   if (value === null || Number.isNaN(value)) return DASH;
-  if (unit === "GBP") return money(value);
+  if (unit === "GBP") return currency.code === "GBP" ? money(value) : converted(value, currency, true);
   if (unit === "ratio") return `${roundTo(value * 100, 1).toFixed(1)}%`;
   return grouped.format(value);
 }
 
 /** Exact value for tooltips and screen readers. */
-export function formatExact(value: number | null, unit: Unit): string {
+export function formatExact(value: number | null, unit: Unit, currency: CurrencyPreference = BASE_CURRENCY): string {
   if (value === null) return "no data";
-  if (unit === "GBP") return `£${pence.format(roundTo(value, 2))}`;
+  if (unit === "GBP") return currency.code === "GBP" ? `£${pence.format(roundTo(value, 2))}` : converted(value, currency, false);
   if (unit === "ratio") return `${roundTo(value * 100, 2)}%`;
   return grouped.format(value);
 }

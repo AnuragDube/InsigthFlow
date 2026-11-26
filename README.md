@@ -36,6 +36,9 @@ Use **Forecast** on a published dataset with at least 35 calendar days to compar
 seven-day gross-revenue forecasts and their historical mean absolute errors.
 Use **Customers** to compare four segments based on when known customers last bought,
 how often they ordered, and how much they spent in the published sales window.
+Use **Display currency** on a monetary report to switch between GBP, USD, EUR, and INR.
+For currencies other than GBP, enter a manual rate per pound. The browser applies that
+rate to displayed amounts across all dates. Published values and API responses stay in GBP.
 
 For frontend development with hot reload, run the API as above and `npm run dev` in `frontend/`
 (http://localhost:5173, proxies `/api`). End-to-end tests: `npm run e2e` in `frontend/`.
