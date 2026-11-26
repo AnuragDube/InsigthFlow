@@ -151,3 +151,19 @@ export interface CustomerSegments {
     gross_revenue: number;
   }[];
 }
+
+export interface InactivityBacktest {
+  published_run_id: string;
+  evaluation: {
+    cohort_from: string;
+    snapshot_date: string;
+    holdout_through: string;
+    customers: number;
+    flagged: number;
+    inactive: number;
+    true_positives: number;
+    precision: number | null;
+    recall: number | null;
+    baseline_rate: number | null;
+  };
+}

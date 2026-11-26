@@ -119,3 +119,10 @@ def customer_segments(
     dataset_id: uuid.UUID, ctx: Ctx, engine: Eng, settings: Cfg
 ) -> dict[str, Any]:
     return service.customer_segments(ctx, engine, settings, dataset_id)
+
+
+@router.get("/datasets/{dataset_id}/inactivity-backtest")
+def inactivity_backtest(
+    dataset_id: uuid.UUID, ctx: Ctx, engine: Eng, settings: Cfg
+) -> dict[str, Any]:
+    return service.inactivity_backtest(ctx, engine, settings, dataset_id)
