@@ -39,6 +39,8 @@ how often they ordered, and how much they spent in the published sales window.
 Use **Display currency** on a monetary report to switch between GBP, USD, EUR, and INR.
 For currencies other than GBP, enter a manual rate per pound. The browser applies that
 rate to displayed amounts across all dates. Published values and API responses stay in GBP.
+Use **Download KPI CSV** on Overview to export the selected period with canonical values,
+comparison fields, and the published run ID.
 
 For frontend development with hot reload, run the API as above and `npm run dev` in `frontend/`
 (http://localhost:5173, proxies `/api`). End-to-end tests: `npm run e2e` in `frontend/`.

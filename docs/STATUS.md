@@ -64,6 +64,8 @@ The Data page reports retained CSV bytes and the configured quota for the curren
 tabs share a browser preference for GBP, USD, EUR, or INR. Non-GBP displays require a
 user-entered rate per pound. The same rate applies across the displayed date range.
 Canonical reports, dataset history, SQL, and quality rules remain denominated in GBP.
+The Overview tab can download the displayed period's KPI rows as CSV. The export includes
+the published run ID, uses canonical units, and leaves missing comparisons blank.
 
 M5 Linux verification passed **152 backend tests in 25.34 s**, along with Ruff lint,
 formatting, and mypy. The authorization test covers all seven mutation routes and

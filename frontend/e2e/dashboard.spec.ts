@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 test("first run: load sample data, watch it publish, read the dashboard", async ({ page }, info) => {
@@ -25,6 +26,22 @@ test("first run: load sample data, watch it publish, read the dashboard", async 
   // batch_b fixture: 15.30 + 18.50 + 19.50 + 19.50 + 2.95 = £75.75 across 4 invoices.
   await expect(page.getByRole("heading", { level: 1 })).toContainText("£75.75 gross revenue from 4 orders");
   await expect(page.getByText("quality checks passed")).toBeVisible();
+  await page.getByText("Display currency (GBP)", { exact: true }).click();
+  await page.getByRole("combobox", { name: "Display currency", exact: true }).selectOption("USD");
+  await page.getByRole("spinbutton", { name: "1 GBP in USD" }).fill("2");
+  await page.getByRole("button", { name: "Apply currency" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("USD 151.50");
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download KPI CSV" }).click();
+  const download = await downloaded;
+  expect(download.suggestedFilename()).toMatch(/^insightflow-kpis-.*\.csv$/);
+  const csvReport = await readFile(await download.path(), "utf8");
+  expect(csvReport).toContain("gross_revenue,GBP,75.75,");
+  expect(csvReport).toContain("published_run_id");
+  await page.getByText("Display currency (USD, manual rate)", { exact: true }).click();
+  await page.getByRole("combobox", { name: "Display currency", exact: true }).selectOption("GBP");
+  await page.getByRole("button", { name: "Apply currency" }).click();
+
   await page.screenshot({ path: `test-results/overview-${info.project.name}.png`, fullPage: true });
 
   await page.getByRole("button", { name: "Ask", exact: true }).click();
