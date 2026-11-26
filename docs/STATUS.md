@@ -26,6 +26,15 @@ and a workspace sign-in screen using OAuth authorization code with PKCE. Integra
 exercise the callback with a simulated provider and locally signed tokens. Selecting and
 connecting a live provider, then verifying sign-in against that provider, remain open.
 
+**M7 pilot audit attribution is implemented for existing mutation events.** Dataset creation,
+CSV ingestion and validation failures recorded by ingestion, batch toggles, and document uploads
+and deletions carry a workspace-scoped actor reference in authenticated mode. Pipeline completion
+is recorded as a system event. Coverage for denied requests, explicit rebuild requests, and
+membership changes remains open. See [Audit logging](SECURITY.md#10-audit-logging).
+Linux verification on Python 3.12.14 passed **165 tests in 39.71 s**, with Ruff lint and
+formatting and mypy passing. Integration checks cover different workspace references for the same
+provider account, stable attribution across cookie renewal, and system-owned pipeline completion.
+
 **M6 forecasting baseline is implemented.** The Forecast tab compares the previous-week
 seasonal baseline with a four-week matching-weekday average for the next seven days of gross
 revenue. Both methods are evaluated on up to four held-out weekly windows. The feature uses

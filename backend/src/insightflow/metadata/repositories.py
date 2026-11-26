@@ -250,12 +250,18 @@ class AuditRepo:
         *,
         action: str,
         outcome: str = "success",
-        actor_type: str = "anonymous",
+        actor_type: str | None = None,
         target_type: str | None = None,
         target_id: uuid.UUID | None = None,
         details: dict[str, Any] | None = None,
         at: datetime | None = None,
     ) -> AuditEvent:
+        actor_ref = ctx.audit_actor_ref if ctx else None
+        if actor_type is None:
+            actor_type = "user" if actor_ref else "anonymous"
+        event_details = dict(details or {})
+        if actor_type == "user" and actor_ref:
+            event_details["actor_ref"] = actor_ref
         ev = AuditEvent(
             id=new_id(),
             org_id=ctx.org_id if ctx else None,
@@ -265,7 +271,7 @@ class AuditRepo:
             target_type=target_type,
             target_id=target_id,
             correlation_id=correlation_id.get(),
-            details=details or {},
+            details=event_details,
         )
         if at is not None:
             ev.occurred_at = at

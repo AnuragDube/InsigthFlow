@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated
@@ -23,6 +25,7 @@ from insightflow.metadata.memberships import role_for
 class Principal:
     org_id: UUID
     role: Role
+    identity: VerifiedIdentity | None = None
 
 
 IdentityResolver = Callable[[Request], VerifiedIdentity | None]
@@ -61,7 +64,7 @@ def get_principal(request: Request, engine: Annotated[Engine, Depends(get_engine
         role = role_for(session, identity)
     if role is None:
         raise ForbiddenError("You do not have access to this workspace.")
-    return Principal(identity.org_id, role)
+    return Principal(identity.org_id, role, identity)
 
 
 Authenticated = Annotated[Principal, Depends(get_principal)]
@@ -74,4 +77,9 @@ def get_org_context(principal: Authenticated) -> OrgContext:
 def get_editor_context(principal: Authenticated) -> OrgContext:
     if principal.role not in {"owner", "editor"}:
         raise ForbiddenError("This action requires an editor or owner role.")
-    return OrgContext(principal.org_id)
+    if principal.identity is None:
+        return OrgContext(principal.org_id)
+    identity = principal.identity
+    # The workspace and issuer namespace the subject. Store no raw provider identifiers.
+    actor = json.dumps([str(principal.org_id), identity.issuer, identity.subject])
+    return OrgContext(principal.org_id, hashlib.sha256(actor.encode("utf-8")).hexdigest())

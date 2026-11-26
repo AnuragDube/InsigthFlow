@@ -14,6 +14,7 @@ class OrgContext:
     """
 
     org_id: uuid.UUID
+    audit_actor_ref: str | None = None
 
 
 Role = Literal["owner", "editor", "viewer"]

@@ -4,6 +4,7 @@ import uuid
 
 from fastapi import Request
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from insightflow.api.app import create_app
 from insightflow.core.context import VerifiedIdentity
@@ -11,7 +12,7 @@ from insightflow.core.settings import Settings
 from insightflow.metadata.bootstrap import ensure_org
 from insightflow.metadata.db import session_scope
 from insightflow.metadata.memberships import set_role
-from insightflow.metadata.models import Organization
+from insightflow.metadata.models import AuditEvent, Organization
 from pipeline_helpers import FIX
 
 H = {"X-InsightFlow-Client": "web"}
@@ -118,7 +119,13 @@ def test_principal_scopes_reads_and_requires_editor_for_writes(settings: Setting
         )
         assert client.post(f"{ds}/load-sample", headers=other).status_code == 404
         assert client.delete(doc_path, headers=other).status_code == 404
-        assert client.delete(doc_path, headers=editor).status_code == 204
+        deleted = client.delete(doc_path, headers=editor)
+        assert deleted.status_code == 204
+        invalid = client.post(
+            f"{ds}/uploads", files={"file": ("bad.csv", b"wrong,header\n1,2\n")}, headers=editor
+        )
+        assert invalid.status_code == 422
+        assert client.post(DATASETS, json={"name": "Only second"}, headers=other).status_code == 201
 
         with session_scope(app.state.engine) as session:
             set_role(session, identities["editor"], "viewer")
@@ -128,3 +135,30 @@ def test_principal_scopes_reads_and_requires_editor_for_writes(settings: Setting
             set_role(session, identities["editor"], None)
         assert client.get(DATASETS, headers=editor).status_code == 403
         assert client.get(DATASETS, headers=other).status_code == 200
+
+        with session_scope(app.state.engine) as session:
+            events = session.scalars(select(AuditEvent).where(AuditEvent.org_id == first)).all()
+            user_events = [event for event in events if event.actor_type == "user"]
+            refs = {event.details["actor_ref"] for event in user_events}
+            assert len(refs) == 1
+            assert len(user_events) == 5
+            assert {(event.action, event.outcome) for event in user_events} == {
+                ("dataset.create", "success"),
+                ("dataset.upload", "success"),
+                ("dataset.upload", "error"),
+                ("document.upload", "success"),
+                ("document.delete", "success"),
+            }
+            deletion = next(event for event in user_events if event.action == "document.delete")
+            assert deletion.correlation_id == deleted.headers["X-Correlation-ID"]
+            assert deletion.target_id == uuid.UUID(doc.json()["id"])
+            assert deletion.details == {"actor_ref": next(iter(refs))}
+            system_events = [event for event in events if event.action == "pipeline.run"]
+            assert len(system_events) == 1
+            assert system_events[0].actor_type == "system"
+            assert "actor_ref" not in system_events[0].details
+            second_event = session.scalars(
+                select(AuditEvent).where(AuditEvent.org_id == second)
+            ).one()
+            assert second_event.actor_type == "user"
+            assert second_event.details["actor_ref"] not in refs

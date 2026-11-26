@@ -15,8 +15,9 @@ log = logging.getLogger(__name__)
 
 
 def run_in_background(
-    ctx: OrgContext, engine: Engine, settings: Settings, run_id: uuid.UUID
+    org_id: uuid.UUID, engine: Engine, settings: Settings, run_id: uuid.UUID
 ) -> None:
+    ctx = OrgContext(org_id)
     try:
         runs = run_pipeline(ctx, engine, settings, run_id)
         prune_old_runs(ctx, engine, settings, runs[-1].data_source_id)

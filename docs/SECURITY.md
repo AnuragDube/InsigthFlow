@@ -199,6 +199,14 @@ must be stopped by layer 3's timeout. Grows over time.
 Append-only table; application DB role gets `INSERT, SELECT` only on `audit_events` (Postgres). Events
 never contain secrets, passwords, raw document text or full prompts. IPs stored as salted hashes.
 
+In the current SQLite pilot, existing dataset and document mutation events use `actor_type=user`
+when an editor or owner is authenticated. `details.actor_ref` is a pseudonymous SHA-256 digest of
+the JSON array `[workspace_id, issuer, subject]` serialized with Python's default `json.dumps`
+and encoded as UTF-8. It is stable across session renewal and workspace role changes, and scoped
+by workspace and issuer. Treat actor references as workspace metadata. A party with the original
+identity tuple can recompute the digest. The localhost demo remains anonymous and pipeline
+completion stays a system event. Existing records retain their original attribution.
+
 ## 11. Safe error messages
 - Domain errors → stable `type` URIs (`/errors/quality-gate-failed`, `/errors/sql-rejected`) with human text.
 - Unexpected errors → 500 "Something went wrong" + correlation id; full trace server-side only.

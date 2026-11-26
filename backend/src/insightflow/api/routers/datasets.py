@@ -49,7 +49,7 @@ def _queue(
     run = request_run(ctx, engine, source_id, trigger=trigger, code_version=settings.code_version)
     if run is None:
         return RunRequestOut(run_id=None, rerun_queued=True)
-    tasks.add_task(run_in_background, ctx, engine, settings, run.id)
+    tasks.add_task(run_in_background, ctx.org_id, engine, settings, run.id)
     return RunRequestOut(run_id=run.id, rerun_queued=False)
 
 
@@ -122,7 +122,7 @@ def load_sample(
         ctx, engine, dataset_id, trigger="sample", code_version=settings.code_version
     )
     if run is not None:
-        tasks.add_task(run_in_background, ctx, engine, settings, run.id)
+        tasks.add_task(run_in_background, ctx.org_id, engine, settings, run.id)
     elif not rerun_queued:
         response.status_code = status.HTTP_200_OK
     return RunRequestOut(run_id=run.id if run else None, rerun_queued=rerun_queued)

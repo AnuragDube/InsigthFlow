@@ -15,7 +15,7 @@ from insightflow.metadata.bootstrap import ensure_org
 from insightflow.metadata.browser_sessions import COOKIE_NAME, SESSION_SECONDS
 from insightflow.metadata.db import session_scope
 from insightflow.metadata.memberships import set_role
-from insightflow.metadata.models import BrowserSession
+from insightflow.metadata.models import AuditEvent, BrowserSession
 
 H = {"X-InsightFlow-Client": "web"}
 SESSION = "/api/v1/session"
@@ -67,6 +67,13 @@ def test_browser_session_exchange_lifecycle(settings: Settings) -> None:
         stale_cookie = {"Cookie": f"{COOKIE_NAME}={first_token}"}
         assert client.get(DATASETS, headers=stale_cookie).status_code == 401
         assert client.get(DATASETS).status_code == 200
+        assert client.post(DATASETS, headers=H, json={"name": "Second dataset"}).status_code == 201
+        with session_scope(app.state.engine) as session:
+            events = session.scalars(
+                select(AuditEvent).where(AuditEvent.org_id == org.org_id)
+            ).all()
+            assert [event.actor_type for event in events] == ["user", "user"]
+            assert len({event.details["actor_ref"] for event in events}) == 1
 
         with session_scope(app.state.engine) as session:
             set_role(session, identity, "viewer")

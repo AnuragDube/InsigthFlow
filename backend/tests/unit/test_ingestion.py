@@ -106,3 +106,4 @@ def test_successful_upload_is_audited(settings: Settings, env) -> None:  # type:
     with session_scope(env[0]) as s:
         ev = s.scalars(select(AuditEvent).where(AuditEvent.action == "dataset.upload")).one()
         assert ev.target_id == ing.id and ev.outcome == "success"
+        assert ev.actor_type == "anonymous" and "actor_ref" not in ev.details
