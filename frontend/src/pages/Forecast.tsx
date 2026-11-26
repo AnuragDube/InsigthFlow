@@ -1,8 +1,10 @@
+import { useCurrency } from "../lib/currency";
 import { useQuery } from "@tanstack/react-query";
 import { ApiError, api } from "../api/client";
 import { formatDate, formatValue } from "../lib/format";
 
 export function Forecast({ datasetId, runId }: { datasetId: string; runId: string | null }) {
+  const currency = useCurrency();
   const forecast = useQuery({
     queryKey: ["forecast", datasetId, runId],
     queryFn: () => api.forecast(datasetId),
@@ -27,8 +29,8 @@ export function Forecast({ datasetId, runId }: { datasetId: string; runId: strin
                 {report.points.map((point) => (
                   <tr key={point.date}>
                     <th scope="row">{formatDate(point.date)}</th>
-                    <td className="num">{formatValue(point.seasonal_naive, report.unit)}</td>
-                    <td className="num">{formatValue(point.weekday_average, report.unit)}</td>
+                    <td className="num">{formatValue(point.seasonal_naive, report.unit, currency)}</td>
+                    <td className="num">{formatValue(point.weekday_average, report.unit, currency)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -38,8 +40,8 @@ export function Forecast({ datasetId, runId }: { datasetId: string; runId: strin
             <h2>Historical forecast error</h2>
             <p>
               Mean absolute error over {report.backtest.days_evaluated} held-out days:
-              {" "}{formatValue(report.backtest.seasonal_naive_mae, report.unit)} for the previous-week baseline
-              and {formatValue(report.backtest.weekday_average_mae, report.unit)} for the weekday average.
+              {" "}{formatValue(report.backtest.seasonal_naive_mae, report.unit, currency)} for the previous-week baseline
+              and {formatValue(report.backtest.weekday_average_mae, report.unit, currency)} for the weekday average.
             </p>
             <p className="hint">
               Days without sales are treated as zero. Check that the latest sales day is complete

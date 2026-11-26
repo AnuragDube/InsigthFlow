@@ -1,4 +1,4 @@
-import { formatChange, formatDateRange, formatValue } from "./format";
+import { formatChange, formatDateRange, formatExact, formatValue } from "./format";
 
 describe("formatValue", () => {
   it("abbreviates large money amounts", () => {
@@ -17,6 +17,13 @@ describe("formatValue", () => {
   });
   it("shows a dash when there is no data", () => {
     expect(formatValue(null, "GBP")).toBe("—");
+  });
+  it("converts money with the manual rate and preserves counts and ratios", () => {
+    const currency = { code: "INR", rate: 2 } as const;
+    expect(formatValue(2, "GBP", currency)).toMatch(/^INR\s4\.00$/);
+    expect(formatExact(-2, "GBP", currency)).toMatch(/^-INR\s4\.00$/);
+    expect(formatValue(2000, "count", currency)).toBe("2,000");
+    expect(formatValue(0.25, "ratio", currency)).toBe("25.0%");
   });
 });
 

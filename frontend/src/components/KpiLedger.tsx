@@ -1,3 +1,4 @@
+import { useCurrency } from "../lib/currency";
 import { useId, useState } from "react";
 import type { Kpi } from "../api/types";
 import { formatChange, formatExact, formatValue } from "../lib/format";
@@ -12,6 +13,7 @@ function deltaClass(kpi: Kpi): string {
 }
 
 function KpiItem({ kpi, comparison }: { kpi: Kpi; comparison: string | null }) {
+  const currency = useCurrency();
   const [open, setOpen] = useState(false);
   const defId = useId();
   return (
@@ -30,8 +32,8 @@ function KpiItem({ kpi, comparison }: { kpi: Kpi; comparison: string | null }) {
         </button>
       </dt>
       <dd>
-        <div className="value" title={formatExact(kpi.value, kpi.unit)}>
-          {formatValue(kpi.value, kpi.unit)}
+        <div className="value" title={formatExact(kpi.value, kpi.unit, currency)}>
+          {formatValue(kpi.value, kpi.unit, currency)}
         </div>
         {comparison && (
           <div>

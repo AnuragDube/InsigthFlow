@@ -1,3 +1,4 @@
+import { useCurrency } from "../lib/currency";
 import { useQuery } from "@tanstack/react-query";
 import { ApiError, api } from "../api/client";
 import { formatDate, formatDateRange, formatValue } from "../lib/format";
@@ -10,6 +11,7 @@ const LABELS: Record<string, string> = {
 };
 
 export function Customers({ datasetId, runId }: { datasetId: string; runId: string | null }) {
+  const currency = useCurrency();
   const query = useQuery({
     queryKey: ["customer-segments", datasetId, runId],
     queryFn: () => api.customerSegments(datasetId),
@@ -40,7 +42,7 @@ export function Customers({ datasetId, runId }: { datasetId: string; runId: stri
                     <th scope="row">{LABELS[segment.key] ?? segment.key}<br /><small>{segment.definition}</small></th>
                     <td className="num">{formatValue(segment.customers, "count")}</td>
                     <td className="num">{formatValue(segment.orders, "count")}</td>
-                    <td className="num">{formatValue(segment.gross_revenue, "GBP")}</td>
+                    <td className="num">{formatValue(segment.gross_revenue, "GBP", currency)}</td>
                   </tr>
                 ))}
               </tbody>

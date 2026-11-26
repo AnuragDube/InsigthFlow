@@ -1,3 +1,4 @@
+import { useCurrency } from "../lib/currency";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ApiError, api } from "../api/client";
@@ -48,6 +49,7 @@ function kpi(d: Dashboard, name: string) {
 }
 
 export function Overview({ datasetId, onOpenData }: { datasetId: string; onOpenData: () => void }) {
+  const currency = useCurrency();
   const [preset, setPreset] = useState<Preset>("all");
   const [range, setRange] = useState<{ from?: string; to?: string }>({});
   const q = useQuery({
@@ -106,7 +108,7 @@ export function Overview({ datasetId, onOpenData }: { datasetId: string; onOpenD
   return (
     <>
       <h1 className="summary">
-        <strong>{formatValue(gross?.value ?? null, "GBP")}</strong> gross revenue from{" "}
+        <strong>{formatValue(gross?.value ?? null, "GBP", currency)}</strong> gross revenue from{" "}
         {formatValue(orders?.value ?? null, "count")} orders, {formatDateRange(d.range.from, d.range.to)}.
       </h1>
 
