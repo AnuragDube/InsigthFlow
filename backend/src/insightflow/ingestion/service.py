@@ -23,7 +23,12 @@ import duckdb
 from sqlalchemy.engine import Engine
 
 from insightflow.core.context import OrgContext
-from insightflow.core.errors import ConflictError, PayloadTooLarge, ValidationFailed
+from insightflow.core.errors import (
+    ConflictError,
+    PayloadTooLarge,
+    ValidationFailed,
+    WorkspaceUploadQuotaExceeded,
+)
 from insightflow.core.ids import new_id
 from insightflow.core.settings import Settings
 from insightflow.domains.loader import load_domain_pack
@@ -105,6 +110,15 @@ def _reject(
         )  # fmt: skip
 
 
+def _check_workspace_quota(
+    ingestions: IngestionRepo, ctx: OrgContext, size: int, quota: int
+) -> None:
+    if ingestions.stored_bytes(ctx) + size > quota:
+        raise WorkspaceUploadQuotaExceeded(
+            "This upload would exceed the workspace's quota for retained CSV files."
+        )
+
+
 def ingest_file(
     ctx: OrgContext,
     engine: Engine,
@@ -121,13 +135,17 @@ def ingest_file(
     paths.tmp.mkdir(parents=True, exist_ok=True)
     tmp = paths.tmp / f"upload-{new_id()}.part"
     safe_name = Path(original_name).name[:255] or "upload.csv"  # display only, never a path
+    quota = settings.max_workspace_upload_mb * 1024 * 1024
     try:
         sha, size = _spool(src, tmp, settings.max_upload_mb * 1024 * 1024)
 
         with session_scope(engine) as s:
-            existing = IngestionRepo(s).find_stored_by_sha(ctx, source_id, sha)
-        if existing is not None:
-            return IngestResult(existing, created=False)
+            ingestions = IngestionRepo(s)
+            ingestions.lock_workspace_storage(ctx)
+            existing = ingestions.find_stored_by_sha(ctx, source_id, sha)
+            if existing is not None:
+                return IngestResult(existing, created=False)
+            _check_workspace_quota(ingestions, ctx, size, quota)
 
         try:
             header = _read_header(tmp)
@@ -154,10 +172,13 @@ def ingest_file(
             }
             (out_dir / "_manifest.json").write_text(json.dumps(manifest, indent=2), "utf-8")
             with session_scope(engine) as s:
+                ingestions = IngestionRepo(s)
+                ingestions.lock_workspace_storage(ctx)
+                _check_workspace_quota(ingestions, ctx, size, quota)
                 # Same transaction as the batch: durable "pending work" marker. If the process dies
                 # before a run is requested, the startup sweep still processes this batch.
                 DataSourceRepo(s).lock(ctx, source_id).rerun_requested_at = datetime.now(UTC)
-                ing = IngestionRepo(s).add(
+                ing = ingestions.add(
                     ctx, source_id, ingestion_id=ingest_id, original_name=safe_name,
                     sha256=sha, size_bytes=size, status="stored", row_count=rows,
                     storage_path=out_dir.relative_to(paths.root).as_posix(),

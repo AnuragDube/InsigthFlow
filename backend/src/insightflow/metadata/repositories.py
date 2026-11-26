@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -23,6 +23,7 @@ from insightflow.metadata.models import (
     AuditEvent,
     DataSource,
     Ingestion,
+    Organization,
     PipelineRun,
     PipelineStageRun,
     QualityResult,
@@ -129,6 +130,24 @@ class IngestionRepo:
         if ing is None or ing.data_source_id != source_id:
             raise NotFoundError("Ingestion not found.")
         return ing
+
+    def lock_workspace_storage(self, ctx: OrgContext) -> None:
+        """Serialize storage accounting by workspace on SQLite and PostgreSQL."""
+        self.s.execute(
+            update(Organization)
+            .where(Organization.id == ctx.org_id)
+            .values(status=Organization.status)
+        )
+
+    def stored_bytes(self, ctx: OrgContext) -> int:
+        return (
+            self.s.scalar(
+                select(func.coalesce(func.sum(Ingestion.size_bytes), 0)).where(
+                    Ingestion.org_id == ctx.org_id, Ingestion.status == "stored"
+                )
+            )
+            or 0
+        )
 
     def find_stored_by_sha(
         self, ctx: OrgContext, source_id: uuid.UUID, sha256: str

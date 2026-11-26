@@ -55,6 +55,10 @@ workspace, verify the copied database, and restore it into a fresh directory. Th
 smoke test reads the same published dashboard and documents from the restored workspace.
 PostgreSQL backup and live snapshots remain outside this increment.
 
+**M7 workspace CSV quota is implemented.** The default retained-upload quota is 5 GiB per
+workspace and can be changed through settings. Concurrent uploads serialize the final
+quota check. Same-dataset duplicates reuse their prior ingestion.
+
 M5 Linux verification passed **152 backend tests in 25.34 s**, along with Ruff lint,
 formatting, and mypy. The authorization test covers all seven mutation routes and
 cross-organization access to published analysis and documents.
@@ -202,7 +206,7 @@ published run ID.
 |---|---|---|
 | Release blocker | All HTTP calls resolve to the demo org. The custom mutation header, explicit CORS, trusted hosts, body cap and CSP harden a local demo. ADR-0016 auth/RBAC and the designed public read-only mode are absent. | Loopback only. Require authentication, authorization and cross-org HTTP tests before handling customer data or exposing a service. |
 | Addressed on reliability branch | Dashboard freshness, quality and results share a run ID, including when a new publication arrives mid-request. Missing published Gold files return a safe 503. | Windows rehearsal remains open. |
-| High before shared deployment | Analytics limits ranges to 3,660 days. Endpoint-level deadlines and concurrency budgets are absent. Uploads cap the body and spool size, but header reads can consume the whole allowed body, and cumulative storage is unbounded. | Bound query work, cap header length, add storage quotas and define safe retention before sharing. |
+| High before shared deployment | Analytics limits ranges to 3,660 days. Endpoint-level deadlines and concurrency budgets are pending. The CSV quota covers retained source bytes. Temporary uploads and derived storage need separate budgets. | Bound query work and define warehouse retention before sharing. |
 | High before parallel workers | Startup recovery treats all active runs as interrupted. Artifact pruning and local storage assume single-process ownership. A process killed before the ingest transaction commits can leave unreferenced files. | Retain one process for now. Test reconciliation and restore, and add durable claims only when a second worker is necessary. |
 | Medium | Revenue reconciliation shares Silver eligibility flags with Gold. The overlap warning uses a nonnegative threshold and serves as telemetry. Bronze manifest lacks receipt time and row lineage lacks file/time fields. Country names are trim-only. | Add independent control totals and lineage. Preserve raw values and confirm normalization policy. |
 | Medium | Repeated sample loads can enqueue an unchanged rebuild. Date parsing quarantines ambiguous Excel-style values. Re-uploading an inactive batch keeps it inactive. | Confirm intended UX, document it and cover approved behavior with regressions. |

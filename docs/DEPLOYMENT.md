@@ -98,6 +98,14 @@ object storage, a contracted LLM provider. Revisit costs when there is revenue v
 
 ## 7. Operational notes
 
+### Workspace upload quotas
+
+Set `INSIGHTFLOW_MAX_WORKSPACE_UPLOAD_MB` to cap retained CSV bytes per workspace in MiB.
+The default is 5,120 MiB. Files count while stored, including deactivated batches, because
+Bronze retains their raw copies. Uploading identical bytes again to the same dataset reuses
+the stored batch. A quota rejection leaves the published run intact. This quota tracks raw
+CSV bytes. Budget disk space separately for transient uploads, Parquet, DuckDB, and backups.
+
 ### SQLite workspace backup and restore
 
 Let running pipeline work finish, then stop InsightFlow before copying the workspace. The

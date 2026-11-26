@@ -26,6 +26,10 @@ class ConflictError(AppError):
     status, type_slug, title = 409, "conflict", "Conflict"
 
 
+class WorkspaceUploadQuotaExceeded(ConflictError):
+    type_slug, title = "workspace-upload-quota", "Workspace upload quota reached"
+
+
 class ValidationFailed(AppError):
     status, type_slug, title = 422, "validation-failed", "Validation failed"
 
